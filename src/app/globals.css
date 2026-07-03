@@ -1,0 +1,206 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-sans-var), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-var), ui-monospace, monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+
+  --radius-glass: 1.25rem;
+}
+
+:root {
+  --bg: #f4f5fa;
+  --surface: rgba(255, 255, 255, 0.62);
+  --raised: rgba(255, 255, 255, 0.85);
+  --line: rgba(20, 24, 46, 0.1);
+  --ink: #171a2e;
+  --ink-dim: #565b78;
+  --ink-faint: #8b90ab;
+  --accent: #5b5bd6;
+  --accent-soft: rgba(91, 91, 214, 0.12);
+  --good: #1a9e6c;
+  --warn: #c77a1e;
+  --bad: #d64550;
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 8px 32px rgba(23, 26, 46, 0.08);
+}
+
+.dark {
+  --bg: #0b0d16;
+  --surface: rgba(23, 26, 43, 0.55);
+  --raised: rgba(32, 36, 58, 0.72);
+  --line: rgba(255, 255, 255, 0.09);
+  --ink: #eef0fb;
+  --ink-dim: #9ba1c2;
+  --ink-faint: #666c8f;
+  --accent: #8b8bf5;
+  --accent-soft: rgba(139, 139, 245, 0.16);
+  --good: #3ecf8e;
+  --warn: #f0a84b;
+  --bad: #f26d76;
+  --glass-highlight: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ambient gradient field behind the glass */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ambient::before,
+.ambient::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(110px);
+  opacity: 0.5;
+}
+.ambient::before {
+  width: 44rem;
+  height: 44rem;
+  top: -14rem;
+  left: -10rem;
+  background: radial-gradient(closest-side, var(--accent), transparent);
+}
+.ambient::after {
+  width: 40rem;
+  height: 40rem;
+  bottom: -16rem;
+  right: -8rem;
+  background: radial-gradient(closest-side, #2dd4bf, transparent);
+  opacity: 0.28;
+}
+.dark .ambient::before {
+  opacity: 0.3;
+}
+.dark .ambient::after {
+  opacity: 0.16;
+}
+
+/* liquid glass primitives */
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(22px) saturate(1.6);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  border: 1px solid var(--line);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+  border-radius: var(--radius-glass);
+}
+
+.glass-raised {
+  background: var(--raised);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid var(--line);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 16px 48px rgba(0, 0, 0, 0.28);
+  border-radius: var(--radius-glass);
+}
+
+.glass-pill {
+  background: var(--surface);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  border-radius: 9999px;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* thin scrollbars for dense board columns */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-faint) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 9999px;
+}
+
+input,
+textarea,
+select {
+  outline: none;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 0.5rem;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.drawer-in {
+  animation: drawer-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.97) translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+.pop-in {
+  animation: pop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
