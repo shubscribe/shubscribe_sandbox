@@ -10,10 +10,11 @@ import { cn, monogram } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Dashboard", icon: "◉", key: "1" },
   { href: "/applications", label: "Applications", icon: "▦", key: "2" },
-  { href: "/tasks", label: "Tasks", icon: "☑", key: "3" },
-  { href: "/contacts", label: "Contacts", icon: "☺", key: "4" },
-  { href: "/analytics", label: "Analytics", icon: "◔", key: "5" },
-  { href: "/settings", label: "Settings", icon: "⚙", key: "6" },
+  { href: "/discover", label: "Discover", icon: "◈", key: "3" },
+  { href: "/tasks", label: "Tasks", icon: "☑", key: "4" },
+  { href: "/contacts", label: "Contacts", icon: "☺", key: "5" },
+  { href: "/analytics", label: "Analytics", icon: "◔", key: "6" },
+  { href: "/settings", label: "Settings", icon: "⚙", key: "7" },
 ];
 
 function ThemeToggle() {
@@ -36,10 +37,12 @@ export function Sidebar({
   name,
   email,
   image,
+  discoverCount = 0,
 }: {
   name: string;
   email: string;
   image: string | null;
+  discoverCount?: number;
 }) {
   const pathname = usePathname();
 
@@ -73,6 +76,11 @@ export function Sidebar({
               >
                 <span className="w-4 text-center">{item.icon}</span>
                 {item.label}
+                {item.href === "/discover" && discoverCount > 0 && (
+                  <span className="num rounded-full bg-accent px-1.5 text-[10px] font-semibold text-white">
+                    {discoverCount}
+                  </span>
+                )}
                 <kbd className="ml-auto text-[10px] text-ink-faint">{item.key}</kbd>
               </Link>
             );

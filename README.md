@@ -107,9 +107,44 @@ These are stored in your own database and used only server-side.
 Next.js 15 (App Router) · Auth.js v5 (Google, email allowlist) · Drizzle ORM ·
 Turso/libSQL · Tailwind CSS v4 · dnd-kit · Recharts + d3-sankey · cmdk · sonner
 
-## Roadmap hooks already in place
+## V2 — automated discovery & outreach
 
-- **Email parsing (phase 2)** — Settings stores the Gmail label + auto/suggest
-  preference; the activity/data model is ready for confirmation-email ingestion.
-- **Browser extension (phase 2)** — the same `/api/urlmeta` + `/api/extract`
-  endpoints can back a capture extension.
+V2 adds a **Discover** page and Gmail automation on top of v1 (all additive — v1
+features and data are untouched).
+
+### Job discovery
+
+- **Saved searches** run against Adzuna + JSearch (bring your own free keys),
+  Remotive, RemoteOK, and the latest Hacker News "Who is hiring" thread.
+- **Company watchlist** polls public Greenhouse/Lever career boards (no keys).
+- Matches get an **AI fit score** (0–100 + reasoning) against your target role and
+  profile blurb, then land in the Discover inbox: **✓ Add** creates a prefilled
+  application (and auto-pulls referral contacts via Apollo), **✕** dismisses.
+- Scans run daily via **Vercel Cron** (`vercel.json` is preconfigured — just set a
+  `CRON_SECRET` env var) or on demand with **Scan now**.
+
+Free keys: [Adzuna](https://developer.adzuna.com) ·
+[JSearch on RapidAPI](https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch)
+
+### Gmail automation
+
+1. Add `https://<your-app>.vercel.app/api/gmail/callback` (and the localhost
+   equivalent) to your Google OAuth client's redirect URIs.
+2. Settings → **Connect Gmail** (read-only scanning + draft creation scopes; it is
+   your own Google Cloud project, so only allowlisted accounts can connect).
+3. Each scan finds recruiter replies/interview invites/rejections for your active
+   applications and turns them into **one-click suggestions** on the dashboard —
+   move stage, log activity, create a follow-up task. Nothing is applied without
+   your click. Optionally restrict scanning to one Gmail label in Settings.
+
+### AI outreach drafts
+
+- **Ask referral** on any contact → a personalized referral request (email +
+  LinkedIn DM versions, tone picker), built from your profile blurb + the job.
+- **Draft follow-up** on any application → a polite nudge for stale threads.
+- One click saves email drafts straight into your Gmail drafts folder.
+
+## Roadmap hooks still open
+
+- **Browser extension** — the same `/api/urlmeta` + `/api/extract` endpoints can
+  back a one-click capture extension.

@@ -13,6 +13,19 @@ export type AppSettings = {
   // email parsing (phase 2 stub)
   emailLabel: string;
   emailMode: "suggest" | "auto";
+  // v2: discovery
+  adzunaAppId: string;
+  adzunaAppKey: string;
+  jsearchKey: string;
+  profileBlurb: string;
+  draftTone: "warm" | "direct" | "formal";
+  lastScanAt: string;
+  // v2: gmail connection
+  gmailConnected: boolean;
+  gmailAccessToken: string;
+  gmailRefreshToken: string;
+  gmailTokenExpiry: string; // epoch ms as string
+  lastGmailScanAt: string;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -26,6 +39,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
   apolloApiKey: "",
   emailLabel: "",
   emailMode: "suggest",
+  adzunaAppId: "",
+  adzunaAppKey: "",
+  jsearchKey: "",
+  profileBlurb: "",
+  draftTone: "warm",
+  lastScanAt: "",
+  gmailConnected: false,
+  gmailAccessToken: "",
+  gmailRefreshToken: "",
+  gmailTokenExpiry: "",
+  lastGmailScanAt: "",
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -36,7 +60,7 @@ export async function getSettings(): Promise<AppSettings> {
     ...Object.fromEntries(
       Object.entries(map).map(([k, v]) => {
         if (k === "weeklyGoal" || k === "staleDays") return [k, Number(v)];
-        if (k === "onboarded") return [k, v === "true"];
+        if (k === "onboarded" || k === "gmailConnected") return [k, v === "true"];
         return [k, v];
       })
     ),

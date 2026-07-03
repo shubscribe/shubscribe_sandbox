@@ -9,6 +9,7 @@ import {
   clearDemoData, deleteAllData, bulkImport,
 } from "@/actions/misc";
 import { setArchived, deleteApplication } from "@/actions/applications";
+import { gmailDisconnect } from "@/actions/discovery";
 import { Field, Chip, inputCls, btnGhost } from "@/components/ui/bits";
 import { cn, STAGE_COLORS } from "@/lib/utils";
 import type { AppSettings } from "@/lib/settings";
@@ -295,29 +296,77 @@ export function SettingsView({
         </p>
       </Section>
 
-      <Section title="Email parsing (coming soon)">
-        <p className="mb-3 text-xs text-ink-dim">
-          Phase 2: watch a Gmail label for application confirmations and interview
-          invites, and create/update applications automatically. Preferences are saved
-          now so the feature can pick them up later.
+      <Section title="Job discovery (Discover page)">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Adzuna App ID">
+            <input type="password" className={inputCls}
+              placeholder={s.adzunaAppId ? "••••••  (saved)" : "free at developer.adzuna.com"}
+              onBlur={(e) => e.target.value && persist({ adzunaAppId: e.target.value })} />
+          </Field>
+          <Field label="Adzuna App Key">
+            <input type="password" className={inputCls}
+              placeholder={s.adzunaAppKey ? "••••••  (saved)" : "paste key"}
+              onBlur={(e) => e.target.value && persist({ adzunaAppKey: e.target.value })} />
+          </Field>
+          <Field label="JSearch (RapidAPI) key" className="col-span-2">
+            <input type="password" className={inputCls}
+              placeholder={s.jsearchKey ? "••••••  (saved)" : "free tier at rapidapi.com/jsearch"}
+              onBlur={(e) => e.target.value && persist({ jsearchKey: e.target.value })} />
+          </Field>
+          <Field label="Profile blurb (powers fit scores & referral drafts)" className="col-span-2">
+            <textarea className={cn(inputCls, "h-24 resize-y")}
+              placeholder="e.g. 5 years full-stack (React/Node), shipped consumer products at two startups, strongest in frontend performance…"
+              defaultValue={s.profileBlurb}
+              onBlur={(e) => e.target.value !== s.profileBlurb && persist({ profileBlurb: e.target.value })} />
+          </Field>
+          <Field label="Default draft tone">
+            <select className={inputCls} value={s.draftTone}
+              onChange={(e) => persist({ draftTone: e.target.value as AppSettings["draftTone"] })}>
+              <option value="warm">Warm</option>
+              <option value="direct">Direct</option>
+              <option value="formal">Formal</option>
+            </select>
+          </Field>
+        </div>
+        <p className="mt-2 text-xs text-ink-faint">
+          Remotive, RemoteOK, Hacker News and your company watchlist need no keys at all.
+          Scans run daily via cron (set CRON_SECRET on Vercel) or the Scan-now button.
         </p>
-        <div className="grid grid-cols-2 gap-3 opacity-80">
-          <Field label="Gmail label to watch">
+      </Section>
+
+      <Section title="Gmail connection">
+        {s.gmailConnected ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-good">✓ Connected</span>
+            <span className="text-xs text-ink-faint">
+              Scans find recruiter replies & interview invites and turn them into
+              one-click suggestions. Drafts can be saved straight to Gmail.
+            </span>
+            <button className={cn(btnGhost, "ml-auto !text-bad")}
+              onClick={async () => { await gmailDisconnect(); router.refresh(); toast.success("Gmail disconnected"); }}>
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <a className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              href="/api/gmail/connect">
+              Connect Gmail
+            </a>
+            <span className="text-xs text-ink-faint">
+              Read-only inbox scanning + draft creation. Add
+              <code className="mx-1">/api/gmail/callback</code> to your Google OAuth
+              redirect URIs first (see README).
+            </span>
+          </div>
+        )}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <Field label="Only scan this Gmail label (optional)">
             <input
-              className={inputCls} placeholder="e.g. job-search"
+              className={inputCls} placeholder="e.g. job-search — empty scans Primary"
               defaultValue={s.emailLabel}
               onBlur={(e) => e.target.value !== s.emailLabel && persist({ emailLabel: e.target.value })}
             />
-          </Field>
-          <Field label="When a match is found">
-            <select
-              className={inputCls}
-              value={s.emailMode}
-              onChange={(e) => persist({ emailMode: e.target.value as AppSettings["emailMode"] })}
-            >
-              <option value="suggest">Suggest, I confirm</option>
-              <option value="auto">Auto-create/update</option>
-            </select>
           </Field>
         </div>
       </Section>

@@ -15,7 +15,7 @@ const SHORTCUTS: [string, string][] = [
   ["N", "New application"],
   ["T", "New task"],
   ["B / L", "Board / list view (Applications)"],
-  ["1–6", "Go to page"],
+  ["1–7", "Go to page"],
   ["Esc", "Close dialogs"],
   ["?", "This help"],
 ];
@@ -157,10 +157,11 @@ export function GlobalUI({
           break;
         case "1": router.push("/"); break;
         case "2": router.push("/applications"); break;
-        case "3": router.push("/tasks"); break;
-        case "4": router.push("/contacts"); break;
-        case "5": router.push("/analytics"); break;
-        case "6": router.push("/settings"); break;
+        case "3": router.push("/discover"); break;
+        case "4": router.push("/tasks"); break;
+        case "5": router.push("/contacts"); break;
+        case "6": router.push("/analytics"); break;
+        case "7": router.push("/settings"); break;
       }
     };
     window.addEventListener("keydown", onKey);
@@ -239,6 +240,7 @@ export function GlobalUI({
               >
                 <PaletteItem onSelect={() => go("/")}>◉ Dashboard</PaletteItem>
                 <PaletteItem onSelect={() => go("/applications")}>▦ Applications</PaletteItem>
+                <PaletteItem onSelect={() => go("/discover")}>◈ Discover</PaletteItem>
                 <PaletteItem onSelect={() => go("/tasks")}>☑ Tasks</PaletteItem>
                 <PaletteItem onSelect={() => go("/contacts")}>☺ Contacts</PaletteItem>
                 <PaletteItem onSelect={() => go("/analytics")}>◔ Analytics</PaletteItem>

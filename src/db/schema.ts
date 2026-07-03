@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const id = () =>
   text("id")
@@ -140,4 +140,69 @@ export const activities = sqliteTable("activities", {
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+});
+
+/* ---------- v2: automated job discovery ---------- */
+
+export const searches = sqliteTable("searches", {
+  id: id(),
+  name: text("name").notNull(),
+  keywords: text("keywords").notNull(), // space-separated; all must appear in title+description
+  location: text("location"),
+  remoteOnly: integer("remote_only", { mode: "boolean" }).notNull().default(false),
+  salaryMin: integer("salary_min"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: now(),
+});
+
+// companies whose Greenhouse/Lever boards get polled
+export const watchlist = sqliteTable("watchlist", {
+  id: id(),
+  company: text("company").notNull(),
+  ats: text("ats").notNull(), // greenhouse | lever
+  slug: text("slug").notNull(), // board token, e.g. "stripe"
+  keywords: text("keywords"), // optional filter; empty = all postings
+  createdAt: now(),
+});
+
+export const discovered = sqliteTable(
+  "discovered",
+  {
+    id: id(),
+    source: text("source").notNull(), // adzuna | jsearch | remotive | remoteok | hn | greenhouse | lever
+    externalId: text("external_id").notNull(),
+    searchId: text("search_id"),
+    company: text("company").notNull(),
+    title: text("title").notNull(),
+    url: text("url"),
+    location: text("location"),
+    remote: integer("remote", { mode: "boolean" }),
+    salaryMin: integer("salary_min"),
+    salaryMax: integer("salary_max"),
+    currency: text("currency"),
+    description: text("description"),
+    postedAt: integer("posted_at", { mode: "timestamp_ms" }),
+    fitScore: integer("fit_score"),
+    fitReason: text("fit_reason"),
+    status: text("status").notNull().default("new"), // new | approved | dismissed
+    createdAt: now(),
+  },
+  (t) => [uniqueIndex("discovered_source_ext").on(t.source, t.externalId)]
+);
+
+// one-click-confirm suggestions derived from Gmail scanning
+export const suggestions = sqliteTable("suggestions", {
+  id: id(),
+  applicationId: text("application_id").references(() => applications.id, {
+    onDelete: "cascade",
+  }),
+  gmailThreadId: text("gmail_thread_id").notNull(),
+  subject: text("subject"),
+  fromAddr: text("from_addr"),
+  snippet: text("snippet"),
+  kind: text("kind").notNull(), // interview | rejection | reply
+  proposedStageId: text("proposed_stage_id"),
+  proposedTask: text("proposed_task"),
+  status: text("status").notNull().default("pending"), // pending | applied | dismissed
+  createdAt: now(),
 });

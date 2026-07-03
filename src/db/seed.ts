@@ -174,6 +174,37 @@ async function main() {
     count++;
   }
 
+  /* demo discovered inbox rows (externalId prefixed demo- so "Clear demo data" removes them) */
+  await db.insert(schema.discovered).values([
+    {
+      source: "remotive", externalId: "demo-1",
+      company: "PostHog", title: "Full Stack Engineer - Product Analytics",
+      url: "https://posthog.com/careers", location: "Remote", remote: true,
+      salaryMin: 150000, salaryMax: 190000, currency: "USD",
+      description: "Ship features across our React/Node analytics platform. Strong TypeScript required.",
+      postedAt: new Date(now - 1 * DAY), fitScore: 86,
+      fitReason: "Strong overlap with full-stack TypeScript experience and product focus.",
+    },
+    {
+      source: "greenhouse", externalId: "demo-2",
+      company: "Stripe", title: "Frontend Engineer, Payments UI",
+      url: "https://stripe.com/jobs", location: "San Francisco, CA",
+      salaryMin: 165000, salaryMax: 215000, currency: "USD",
+      description: "Build the surfaces millions of businesses use to accept payments.",
+      postedAt: new Date(now - 2 * DAY), fitScore: 78,
+      fitReason: "Title matches target role; company already in your pipeline (different team).",
+    },
+    {
+      source: "hn", externalId: "demo-3",
+      company: "YC startup (stealth)", title: "Founding Engineer",
+      url: "https://news.ycombinator.com", location: "Remote",
+      description: "Seed-stage, building dev tools. Equity-heavy comp. React + Go stack.",
+      postedAt: new Date(now - 3 * DAY), fitScore: 55,
+      fitReason: "Interesting stack but comp structure and seniority are a stretch.",
+    },
+  ]);
+  console.log("• seeded 3 demo discovered jobs");
+
   /* one unlinked general task */
   await db.insert(schema.tasks).values({
     title: "Refresh resume with latest project",
