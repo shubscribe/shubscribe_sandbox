@@ -11,10 +11,11 @@ const NAV = [
   { href: "/", label: "Dashboard", icon: "◉", key: "1" },
   { href: "/applications", label: "Applications", icon: "▦", key: "2" },
   { href: "/discover", label: "Discover", icon: "◈", key: "3" },
-  { href: "/tasks", label: "Tasks", icon: "☑", key: "4" },
-  { href: "/contacts", label: "Contacts", icon: "☺", key: "5" },
-  { href: "/analytics", label: "Analytics", icon: "◔", key: "6" },
-  { href: "/settings", label: "Settings", icon: "⚙", key: "7" },
+  { href: "/outreach", label: "Outreach", icon: "✉", key: "4" },
+  { href: "/tasks", label: "Tasks", icon: "☑", key: "5" },
+  { href: "/contacts", label: "Contacts", icon: "☺", key: "6" },
+  { href: "/analytics", label: "Analytics", icon: "◔", key: "7" },
+  { href: "/settings", label: "Settings", icon: "⚙", key: "8" },
 ];
 
 function ThemeToggle() {
@@ -38,11 +39,13 @@ export function Sidebar({
   email,
   image,
   discoverCount = 0,
+  outreachCount = 0,
 }: {
   name: string;
   email: string;
   image: string | null;
   discoverCount?: number;
+  outreachCount?: number;
 }) {
   const pathname = usePathname();
 
@@ -79,6 +82,11 @@ export function Sidebar({
                 {item.href === "/discover" && discoverCount > 0 && (
                   <span className="num rounded-full bg-accent px-1.5 text-[10px] font-semibold text-white">
                     {discoverCount}
+                  </span>
+                )}
+                {item.href === "/outreach" && outreachCount > 0 && (
+                  <span className="num rounded-full bg-accent px-1.5 text-[10px] font-semibold text-white">
+                    {outreachCount}
                   </span>
                 )}
                 <kbd className="ml-auto text-[10px] text-ink-faint">{item.key}</kbd>

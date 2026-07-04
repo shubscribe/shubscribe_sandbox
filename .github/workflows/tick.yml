@@ -1,0 +1,24 @@
+# Outreach heartbeat — releases paced sends and progresses sequences.
+# Setup (repo → Settings → Secrets and variables → Actions):
+#   APP_URL      e.g. https://your-app.vercel.app   (no trailing slash)
+#   CRON_SECRET  the same value you set on Vercel
+name: outreach-tick
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/tick
+        run: |
+          if [ -z "${{ secrets.APP_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "APP_URL / CRON_SECRET secrets not set — skipping."
+            exit 0
+          fi
+          curl -sS --max-time 110 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/tick"

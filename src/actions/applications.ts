@@ -123,6 +123,11 @@ export async function moveStage(id: string, toStageId: string) {
     `${app.company}: ${from?.name ?? "—"} → ${to?.name ?? "—"}`,
     { from: app.stageId, to: toStageId }
   );
+  // v3 stop rules: interviewing or terminal stage cancels pending outreach
+  if (to && (to.isTerminal || /interview/i.test(to.name))) {
+    const { stopCampaignForApplication } = await import("@/lib/outreach");
+    await stopCampaignForApplication(id, to.isTerminal ? `application reached ${to.name}` : "you're interviewing — no more cold outreach needed");
+  }
   revalidate();
   return { fromStageId: app.stageId };
 }

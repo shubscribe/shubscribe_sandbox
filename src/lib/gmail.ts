@@ -2,7 +2,7 @@ import "server-only";
 import { db, applications, stages, suggestions } from "@/db";
 import { getSettings, setSettings } from "./settings";
 
-const SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose";
+const SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.send";
 
 export function gmailAuthUrl(origin: string): string {
   const params = new URLSearchParams({
@@ -62,6 +62,13 @@ async function accessToken(): Promise<string> {
   return data.access_token;
 }
 
+export async function gmailSearchMessages(q: string): Promise<{ id: string; threadId: string }[]> {
+  const list = (await gmailGet(`messages?q=${encodeURIComponent(q)}&maxResults=10`)) as {
+    messages?: { id: string; threadId: string }[];
+  };
+  return list.messages ?? [];
+}
+
 async function gmailGet(path: string): Promise<unknown> {
   const token = await accessToken();
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
@@ -70,6 +77,55 @@ async function gmailGet(path: string): Promise<unknown> {
   });
   if (!res.ok) throw new Error(`Gmail API ${path.split("?")[0]} → ${res.status}`);
   return res.json();
+}
+
+function buildMime(
+  to: string, subject: string, body: string,
+  attachment?: { filename: string; mime: string; base64: string }
+): string {
+  if (!attachment) {
+    return Buffer.from(
+      `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${body}`
+    ).toString("base64url");
+  }
+  const boundary = "mc_" + Math.random().toString(36).slice(2);
+  const mime = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    ``,
+    body,
+    ``,
+    `--${boundary}`,
+    `Content-Type: ${attachment.mime}; name="${attachment.filename}"`,
+    `Content-Disposition: attachment; filename="${attachment.filename}"`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    attachment.base64,
+    `--${boundary}--`,
+  ].join("\r\n");
+  return Buffer.from(mime).toString("base64url");
+}
+
+/** Actually send an email from the connected Gmail account. Returns the thread id. */
+export async function sendGmail(
+  to: string, subject: string, body: string,
+  attachment?: { filename: string; mime: string; base64: string }
+): Promise<string> {
+  const token = await accessToken();
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw: buildMime(to, subject, body, attachment) }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`Gmail send failed (${res.status}) — reconnect Gmail in Settings if you connected before v3 (new send permission).`);
+  const data = (await res.json()) as { threadId?: string };
+  return data.threadId ?? "";
 }
 
 export async function createGmailDraft(to: string, subject: string, body: string) {
@@ -151,6 +207,15 @@ export async function scanGmail(): Promise<GmailScanReport> {
     });
     existing.add(m.threadId);
     suggested++;
+  }
+
+  // v3: outreach reply detection — stops sequences for leads who wrote back
+  try {
+    const { detectReplies } = await import("./outreach");
+    const replies = await detectReplies(gmailSearchMessages);
+    if (replies) suggested += replies;
+  } catch {
+    // best-effort; regular suggestions above already succeeded
   }
 
   await setSettings({ lastGmailScanAt: new Date().toISOString() });

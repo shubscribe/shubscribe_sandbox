@@ -12,6 +12,7 @@ import {
   createTask, setTaskCompleted, deleteTask,
   createContact, unlinkContact, findApolloContacts,
 } from "@/actions/misc";
+import { startCampaignFor } from "@/actions/outreach";
 import { cn, faviconUrl, timeAgo, WORK_MODES, JOB_TYPES, INTERVIEW_FORMATS } from "@/lib/utils";
 import { DraftModal } from "./DraftModal";
 import type { AppFull, Stage, Source, Tag } from "@/lib/data";
@@ -44,6 +45,7 @@ export function AppDetail({
   const [showIvForm, setShowIvForm] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
   const [apolloBusy, setApolloBusy] = useState(false);
+  const [campaignBusy, setCampaignBusy] = useState(false);
   const [draftFor, setDraftFor] = useState<
     | { kind: "referral"; contact: { id: string; name: string; email: string | null } }
     | { kind: "followup"; contact: null }
@@ -89,6 +91,24 @@ export function AppDetail({
       onChanged();
     } finally {
       setApolloBusy(false);
+    }
+  }
+
+  async function startCampaign() {
+    setCampaignBusy(true);
+    try {
+      const res = await startCampaignFor(app.id);
+      if (res.created) {
+        toast.success("Campaign started — drafts are waiting in your Outreach queue", {
+          action: { label: "Open queue", onClick: () => router.push("/outreach") },
+        });
+      } else {
+        toast.error(res.reason || "Couldn't start a campaign");
+      }
+      onChanged();
+      router.refresh();
+    } finally {
+      setCampaignBusy(false);
     }
   }
 
@@ -335,6 +355,9 @@ export function AppDetail({
         <SectionTitle
           action={
             <span className="flex gap-3">
+              <button className="text-xs text-accent" onClick={startCampaign} disabled={campaignBusy}>
+                {campaignBusy ? "Preparing…" : "🚀 Start outreach"}
+              </button>
               <button className="text-xs text-accent" onClick={apollo} disabled={apolloBusy}>
                 {apolloBusy ? "Searching…" : "⚡ Find via Apollo"}
               </button>

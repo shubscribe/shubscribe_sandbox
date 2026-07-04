@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { runScan } from "@/lib/discovery";
+import { runScan, runAutopilot } from "@/lib/discovery";
 import { scanGmail } from "@/lib/gmail";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,7 @@ export async function GET(req: Request) {
   }
 
   const discovery = await runScan();
+  const autopilot = await runAutopilot();
   let gmail = null;
   try {
     gmail = await scanGmail();
@@ -23,5 +24,5 @@ export async function GET(req: Request) {
     gmail = { scanned: 0, suggested: 0, error: e instanceof Error ? e.message : "failed" };
   }
 
-  return NextResponse.json({ discovery, gmail });
+  return NextResponse.json({ discovery, autopilot, gmail });
 }

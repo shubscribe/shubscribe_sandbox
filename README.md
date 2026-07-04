@@ -23,6 +23,12 @@ built with Next.js, Turso (SQLite), and Drizzle.
   instead of confirm dialogs, skippable 3-step onboarding.
 - **Your data stays yours** — CSV/JSON export, CSV import, archive with restore,
   demo-data seeding you can clear with one click.
+- **v2: automated discovery** — saved searches + company watchlist scanned daily,
+  AI fit-scored into a Discover inbox; Gmail scanning turns recruiter replies into
+  one-click suggestions ([details](#v2--automated-discovery--outreach)).
+- **v3: outreach autopilot** — high-fit jobs auto-added, leads found per persona,
+  messages drafted and queued; you approve, it sends from your Gmail with pacing
+  and stop rules ([details](#v3--outreach-autopilot)).
 
 ## Quick start (local)
 
@@ -99,7 +105,7 @@ These are stored in your own database and used only server-side.
 | `N` | New application |
 | `T` | New task |
 | `B` / `L` | Board / list view (on Applications) |
-| `1`–`6` | Jump to page |
+| `1`–`8` | Jump to page |
 | `?` | Shortcut help |
 
 ## Stack
@@ -143,6 +149,55 @@ Free keys: [Adzuna](https://developer.adzuna.com) ·
   LinkedIn DM versions, tone picker), built from your profile blurb + the job.
 - **Draft follow-up** on any application → a polite nudge for stale threads.
 - One click saves email drafts straight into your Gmail drafts folder.
+
+## V3 — outreach autopilot
+
+V3 turns discovery into a full pipeline: **jobs found → high-fit ones auto-added →
+leads pulled → messages drafted → campaign queued → paced sends after YOUR
+approval**. Still fully additive — v1 and v2 work unchanged, and nothing is ever
+sent without an explicit approve.
+
+### How the autopilot flows
+
+1. Every scan, discovered jobs scoring **≥ your auto-add threshold** (default 75,
+   Settings → Outreach autopilot) are added to the pipeline automatically; 50–74
+   wait in the Discover inbox; below 50 expire after 14 days.
+2. Each auto-added job gets a **campaign**: Apollo finds ~2 leads per persona
+   (recruiters, hiring managers, peers with your target title) and the AI drafts
+   the first touch for each, personalized from your profile blurb, proof points,
+   and parsed resume.
+3. Drafts wait in **Outreach → Queue**. Edit inline, **Approve** / **Skip**, or
+   approve a whole campaign at once.
+4. The **tick** (every ~30 min) releases approved emails inside your send window
+   (default 9:00–18:00, max 10/day — both configurable) through **your own
+   Gmail**, so they sit in your Sent folder. Step-1 emails attach your default
+   resume (override per campaign). Later steps (bump email, LinkedIn-DM task)
+   draft themselves after each step's delay and wait for approval too.
+5. **Stop rules**: a detected reply stops that lead and surfaces a suggestion;
+   moving the application to Interviewing or a terminal stage cancels its pending
+   sends; a global pause switch lives in Settings.
+
+You can also start a campaign manually from any application (🚀 **Start
+outreach** in the contacts section).
+
+### Setup
+
+- **Reconnect Gmail once** if you connected during v2 — v3 adds the send scope.
+- **Requires** an Apollo key (leads) + an AI key (drafts) — same ones from v1/v2.
+- **The heartbeat**: GitHub Actions is preconfigured in
+  `.github/workflows/tick.yml` (Vercel's free cron only allows daily). Add two
+  repo secrets under *Settings → Secrets and variables → Actions*:
+  - `APP_URL` — e.g. `https://your-app.vercel.app`
+  - `CRON_SECRET` — same value as the Vercel env var
+  There's also a **Run tick now** button on the Outreach page.
+- **Personalization**: upload a resume (PDF text is parsed into drafts), add
+  proof points (one per line), and tune the per-persona sequence in Settings.
+
+### Outreach page
+
+**Queue** (edit/approve/skip drafts) · **Campaigns** (per-company progress,
+pause/stop, resume override) · **Analytics** (sends, replies, which persona
+actually answers) · **History** (every sent message, linked to its Gmail thread).
 
 ## Roadmap hooks still open
 

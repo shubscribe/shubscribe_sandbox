@@ -1,6 +1,6 @@
 import "server-only";
-import { db, searches, watchlist, discovered, applications } from "@/db";
-import { eq } from "drizzle-orm";
+import { db, searches, watchlist, discovered, applications, sources as sourcesTable, stages, activities } from "@/db";
+import { eq, and, lt, isNotNull } from "drizzle-orm";
 import { getSettings, setSettings } from "./settings";
 import { llmJson, hasAiKey } from "./llm";
 
@@ -296,4 +296,68 @@ export async function runScan(): Promise<ScanReport> {
 
 export async function markDiscovered(id: string, status: "approved" | "dismissed") {
   await db.update(discovered).set({ status }).where(eq(discovered.id, id));
+}
+
+const SOURCE_NAME: Record<string, string> = {
+  adzuna: "Adzuna", jsearch: "JSearch", remotive: "Remotive", remoteok: "RemoteOK",
+  hn: "Hacker News", greenhouse: "Company site", lever: "Company site",
+};
+
+/** Turn a discovered job into a pipeline application (shared by manual approve + autopilot). */
+export async function approveDiscoveredCore(id: string): Promise<{ applicationId?: string; error?: string }> {
+  const [j] = await db.select().from(discovered).where(eq(discovered.id, id));
+  if (!j) return { error: "Not found" };
+
+  const sourceName = SOURCE_NAME[j.source] ?? "Other";
+  let src = (await db.select().from(sourcesTable)).find((x) => x.name === sourceName);
+  if (!src) [src] = await db.insert(sourcesTable).values({ name: sourceName, color: "#5aa9e6" }).returning();
+  const firstStage = (await db.select().from(stages)).sort((a, b) => a.position - b.position)[0];
+
+  const [app] = await db.insert(applications).values({
+    company: j.company, title: j.title, url: j.url,
+    location: j.location, workMode: j.remote ? "remote" : null,
+    salaryMin: j.salaryMin, salaryMax: j.salaryMax, currency: j.currency ?? "USD",
+    sourceId: src?.id ?? null, stageId: firstStage?.id ?? null,
+    jdText: j.description,
+  }).returning();
+
+  await db.insert(activities).values({
+    applicationId: app.id, type: "created",
+    message: `Added ${j.title} at ${j.company} (discovered via ${sourceName})`,
+    meta: JSON.stringify({ to: firstStage?.id ?? null }),
+  });
+  await markDiscovered(id, "approved");
+  return { applicationId: app.id };
+}
+
+export type AutopilotReport = { autoAdded: number; campaignsCreated: number; expired: number };
+
+/** v3 autopilot: auto-add high-fit jobs (with campaigns), expire stale low-fit ones. */
+export async function runAutopilot(): Promise<AutopilotReport> {
+  const { getSettings: gs } = await import("./settings");
+  const { createCampaign } = await import("./outreach");
+  const s = await gs();
+  const report: AutopilotReport = { autoAdded: 0, campaignsCreated: 0, expired: 0 };
+
+  const fresh = await db.select().from(discovered).where(eq(discovered.status, "new"));
+  for (const j of fresh) {
+    if (j.fitScore == null || j.fitScore < s.autoAddThreshold) continue;
+    const res = await approveDiscoveredCore(j.id);
+    if (!res.applicationId) continue;
+    report.autoAdded++;
+    const c = await createCampaign(res.applicationId);
+    if (c.created) report.campaignsCreated++;
+  }
+
+  const cutoff = new Date(Date.now() - 14 * 86400000);
+  const stale = await db.select().from(discovered).where(
+    and(eq(discovered.status, "new"), isNotNull(discovered.fitScore), lt(discovered.createdAt, cutoff))
+  );
+  for (const j of stale) {
+    if ((j.fitScore ?? 100) < 50) {
+      await markDiscovered(j.id, "dismissed");
+      report.expired++;
+    }
+  }
+  return report;
 }

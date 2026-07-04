@@ -190,6 +190,68 @@ export const discovered = sqliteTable(
   (t) => [uniqueIndex("discovered_source_ext").on(t.source, t.externalId)]
 );
 
+/* ---------- v3: outreach automation ---------- */
+
+export const resumes = sqliteTable("resumes", {
+  id: id(),
+  name: text("name").notNull(), // display name, e.g. "Frontend resume"
+  filename: text("filename").notNull(),
+  mime: text("mime").notNull(),
+  data: text("data").notNull(), // base64
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  createdAt: now(),
+});
+
+// user-editable sequence, seeded persona-aware; one row per step
+export const sequenceSteps = sqliteTable("sequence_steps", {
+  id: id(),
+  persona: text("persona").notNull(), // recruiter | manager | peer
+  position: integer("position").notNull(), // 1-based
+  type: text("type").notNull(), // email | dm_task
+  delayDays: integer("delay_days").notNull().default(0), // days after previous step sent
+  framing: text("framing").notNull(), // hint fed to the LLM
+  createdAt: now(),
+});
+
+export const campaigns = sqliteTable("campaigns", {
+  id: id(),
+  applicationId: text("application_id")
+    .notNull()
+    .references(() => applications.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("active"), // active | paused | stopped | done
+  resumeId: text("resume_id").references(() => resumes.id, { onDelete: "set null" }), // null = default resume
+  createdAt: now(),
+});
+
+export const leads = sqliteTable("leads", {
+  id: id(),
+  campaignId: text("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  contactId: text("contact_id")
+    .notNull()
+    .references(() => contacts.id, { onDelete: "cascade" }),
+  persona: text("persona").notNull(), // recruiter | manager | peer
+  status: text("status").notNull().default("active"), // active | replied | stopped | done
+  createdAt: now(),
+});
+
+export const outreachMessages = sqliteTable("outreach_messages", {
+  id: id(),
+  leadId: text("lead_id")
+    .notNull()
+    .references(() => leads.id, { onDelete: "cascade" }),
+  stepPosition: integer("step_position").notNull(),
+  type: text("type").notNull(), // email | dm_task
+  subject: text("subject"),
+  body: text("body").notNull(),
+  status: text("status").notNull().default("drafted"), // drafted | approved | scheduled | sent | skipped | cancelled
+  scheduledFor: integer("scheduled_for", { mode: "timestamp_ms" }),
+  sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+  gmailThreadId: text("gmail_thread_id"),
+  createdAt: now(),
+});
+
 // one-click-confirm suggestions derived from Gmail scanning
 export const suggestions = sqliteTable("suggestions", {
   id: id(),

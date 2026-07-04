@@ -1,11 +1,11 @@
 "use server";
 
-import { db, searches, watchlist, discovered, suggestions, applications, sources, stages, tasks, contacts, applicationContacts } from "@/db";
+import { db, searches, watchlist, suggestions, applications, stages, tasks, contacts, applicationContacts } from "@/db";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "./applications";
 import { findApolloContacts } from "./misc";
-import { runScan, markDiscovered, type ScanReport } from "@/lib/discovery";
+import { runScan, runAutopilot, markDiscovered, type ScanReport, type AutopilotReport } from "@/lib/discovery";
 import { scanGmail, createGmailDraft, disconnectGmail, type GmailScanReport } from "@/lib/gmail";
 import { llmJson } from "@/lib/llm";
 import { getSettings } from "@/lib/settings";
@@ -56,8 +56,9 @@ export async function deleteWatch(id: string) {
 
 /* ---------- scan ---------- */
 
-export async function scanNow(): Promise<{ discovery: ScanReport; gmail: GmailScanReport }> {
+export async function scanNow(): Promise<{ discovery: ScanReport; gmail: GmailScanReport; autopilot: AutopilotReport }> {
   const discovery = await runScan();
+  const autopilot = await runAutopilot();
   let gmail: GmailScanReport;
   try {
     gmail = await scanGmail();
@@ -65,41 +66,29 @@ export async function scanNow(): Promise<{ discovery: ScanReport; gmail: GmailSc
     gmail = { scanned: 0, suggested: 0, error: e instanceof Error ? e.message : "failed" };
   }
   revalidate();
-  return { discovery, gmail };
+  return { discovery, gmail, autopilot };
 }
 
 /* ---------- inbox actions ---------- */
 
 export async function approveDiscovered(id: string): Promise<{ applicationId?: string; error?: string }> {
-  const [j] = await db.select().from(discovered).where(eq(discovered.id, id));
-  if (!j) return { error: "Not found" };
+  const { approveDiscoveredCore } = await import("@/lib/discovery");
+  const res = await approveDiscoveredCore(id);
+  if (!res.applicationId) { revalidate(); return res; }
 
-  // map the discovery source to a pipeline source (create if needed)
-  const sourceName = { adzuna: "Adzuna", jsearch: "JSearch", remotive: "Remotive", remoteok: "RemoteOK", hn: "Hacker News", greenhouse: "Company site", lever: "Company site" }[j.source] ?? "Other";
-  let src = (await db.select().from(sources)).find((s) => s.name === sourceName);
-  if (!src) [src] = await db.insert(sources).values({ name: sourceName, color: "#5aa9e6" }).returning();
-
-  const firstStage = (await db.select().from(stages)).sort((a, b) => a.position - b.position)[0];
-
-  const [app] = await db.insert(applications).values({
-    company: j.company, title: j.title, url: j.url,
-    location: j.location, workMode: j.remote ? "remote" : null,
-    salaryMin: j.salaryMin, salaryMax: j.salaryMax, currency: j.currency ?? "USD",
-    sourceId: src?.id ?? null, stageId: firstStage?.id ?? null,
-    jdText: j.description,
-  }).returning();
-
-  await logActivity(app.id, "created", `Added ${j.title} at ${j.company} (discovered via ${sourceName})`, { to: firstStage?.id ?? null });
-  await markDiscovered(id, "approved");
-
-  // auto-fetch referral contacts — best-effort, ignore failures (no key, no matches…)
-  const s = await getSettings();
-  if (s.apolloApiKey) {
-    try { await findApolloContacts(app.id); } catch { /* non-fatal */ }
+  // v3: approval kicks off the full lead→message→campaign chain (best-effort)
+  const { createCampaign } = await import("@/lib/outreach");
+  const c = await createCampaign(res.applicationId);
+  if (!c.created && c.reason !== "campaign exists") {
+    // fall back to plain contact-finding when campaign prereqs are missing (e.g. no AI key)
+    const s = await getSettings();
+    if (s.apolloApiKey) {
+      try { await findApolloContacts(res.applicationId); } catch { /* non-fatal */ }
+    }
   }
 
   revalidate();
-  return { applicationId: app.id };
+  return res;
 }
 
 export async function dismissDiscovered(id: string) {

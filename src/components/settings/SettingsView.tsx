@@ -10,6 +10,10 @@ import {
 } from "@/actions/misc";
 import { setArchived, deleteApplication } from "@/actions/applications";
 import { gmailDisconnect } from "@/actions/discovery";
+import {
+  updateStep, addStep, deleteStep, resetSequence,
+  uploadResume, setDefaultResume, deleteResume,
+} from "@/actions/outreach";
 import { Field, Chip, inputCls, btnGhost } from "@/components/ui/bits";
 import { cn, STAGE_COLORS } from "@/lib/utils";
 import type { AppSettings } from "@/lib/settings";
@@ -49,8 +53,14 @@ function parseCsv(text: string): Record<string, string>[] {
   return body.map((r) => Object.fromEntries(header.map((h, i) => [h.trim(), r[i]?.trim() ?? ""])));
 }
 
+type SeqStep = {
+  id: string; persona: string; position: number;
+  type: string; delayDays: number; framing: string;
+};
+type ResumeRow = { id: string; name: string; filename: string; isDefault: boolean };
+
 export function SettingsView({
-  settings, stages, sources, tags, archived, hasDemo,
+  settings, stages, sources, tags, archived, hasDemo, sequence = [], resumes = [],
 }: {
   settings: AppSettings;
   stages: Stage[];
@@ -58,6 +68,8 @@ export function SettingsView({
   tags: Tag[];
   archived: { id: string; company: string; title: string }[];
   hasDemo: boolean;
+  sequence?: SeqStep[];
+  resumes?: ResumeRow[];
 }) {
   const router = useRouter();
   const [s, setS] = useState(settings);
@@ -66,6 +78,8 @@ export function SettingsView({
   const [newTag, setNewTag] = useState("");
   const [confirmWipe, setConfirmWipe] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const resumeRef = useRef<HTMLInputElement>(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
 
   async function persist(patch: Partial<AppSettings>) {
     setS((prev) => ({ ...prev, ...patch }));
@@ -334,15 +348,229 @@ export function SettingsView({
         </p>
       </Section>
 
+      <Section title="Outreach autopilot">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-ink-faint">
+            Jobs scoring at or above the threshold are auto-added and get a campaign
+            (leads found, first messages drafted). Nothing sends until you approve it
+            in the Outreach queue.
+          </p>
+          <button
+            onClick={() => persist({ outreachPaused: !s.outreachPaused })}
+            className={cn(
+              "shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium",
+              s.outreachPaused ? "bg-bad/20 text-bad" : "bg-good/20 text-good"
+            )}
+          >
+            {s.outreachPaused ? "⏸ Paused — resume" : "● Running — pause all"}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={`Auto-add at fit score ≥ ${s.autoAddThreshold}`}>
+            <input
+              type="range" min={50} max={95} step={5} value={s.autoAddThreshold}
+              onChange={(e) => setS({ ...s, autoAddThreshold: Number(e.target.value) })}
+              onMouseUp={() => persist({ autoAddThreshold: s.autoAddThreshold })}
+              onTouchEnd={() => persist({ autoAddThreshold: s.autoAddThreshold })}
+              className="w-full accent-[var(--accent)]"
+            />
+          </Field>
+          <Field label={`Daily send cap: ${s.dailySendCap} emails`}>
+            <input
+              type="range" min={1} max={40} value={s.dailySendCap}
+              onChange={(e) => setS({ ...s, dailySendCap: Number(e.target.value) })}
+              onMouseUp={() => persist({ dailySendCap: s.dailySendCap })}
+              onTouchEnd={() => persist({ dailySendCap: s.dailySendCap })}
+              className="w-full accent-[var(--accent)]"
+            />
+          </Field>
+          <Field label="Send window — from">
+            <select className={inputCls} value={s.sendWindowStart}
+              onChange={(e) => persist({ sendWindowStart: Number(e.target.value) })}>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Send window — until">
+            <select className={inputCls} value={s.sendWindowEnd}
+              onChange={(e) => persist({ sendWindowEnd: Number(e.target.value) })}>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Proof points (one per line — fed into every draft)" className="col-span-2">
+            <textarea className={cn(inputCls, "h-24 resize-y")}
+              placeholder={"e.g.\nCut page load 40% at Acme\nLed migration to React 19 for 2M-user app"}
+              defaultValue={s.proofPoints}
+              onBlur={(e) => e.target.value !== s.proofPoints && persist({ proofPoints: e.target.value })} />
+          </Field>
+        </div>
+        <p className="mt-2 text-xs text-ink-faint">
+          The heartbeat that releases approved sends runs every ~30 min — set the
+          APP_URL and CRON_SECRET secrets on your GitHub repo (see README) or press
+          &ldquo;Run tick now&rdquo; on the Outreach page.
+        </p>
+      </Section>
+
+      <Section title="Outreach sequence">
+        <p className="mb-3 text-xs text-ink-faint">
+          What gets drafted for each lead, per persona. Delay is days after the
+          previous step was sent. &ldquo;LinkedIn DM&rdquo; steps become tasks with
+          copy-ready text instead of emails.
+        </p>
+        <div className="space-y-4">
+          {(["recruiter", "manager", "peer"] as const).map((persona) => {
+            const steps = sequence.filter((st) => st.persona === persona)
+              .sort((a, b) => a.position - b.position);
+            return (
+              <div key={persona}>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-xs font-medium capitalize text-ink-dim">{persona}s</div>
+                  <button
+                    className="text-[11px] text-ink-faint hover:text-ink"
+                    onClick={async () => {
+                      await addStep(persona, (steps.at(-1)?.position ?? 0) + 1);
+                      router.refresh();
+                    }}
+                  >
+                    + add step
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {steps.map((st) => (
+                    <div key={st.id} className="glass-pill flex items-start gap-2 p-2">
+                      <span className="num mt-1.5 w-5 shrink-0 text-center text-[11px] text-ink-faint">
+                        {st.position}
+                      </span>
+                      <select
+                        className={cn(inputCls, "!w-28 shrink-0 text-xs")}
+                        defaultValue={st.type}
+                        onChange={(e) => updateStep(st.id, { type: e.target.value }).then(() => router.refresh())}
+                      >
+                        <option value="email">Email</option>
+                        <option value="dm_task">LinkedIn DM</option>
+                      </select>
+                      <label className="flex shrink-0 items-center gap-1 text-xs text-ink-faint">
+                        +
+                        <input
+                          type="number" min={0} max={30}
+                          className={cn(inputCls, "!w-14 text-xs")}
+                          defaultValue={st.delayDays}
+                          onBlur={(e) => {
+                            const v = Number(e.target.value);
+                            if (v !== st.delayDays) updateStep(st.id, { delayDays: v }).then(() => router.refresh());
+                          }}
+                        />
+                        d
+                      </label>
+                      <textarea
+                        className={cn(inputCls, "h-14 flex-1 resize-y text-xs")}
+                        defaultValue={st.framing}
+                        onBlur={(e) => e.target.value !== st.framing && updateStep(st.id, { framing: e.target.value }).then(() => router.refresh())}
+                      />
+                      <button
+                        className="mt-1.5 shrink-0 text-ink-faint hover:text-bad"
+                        aria-label="Delete step"
+                        onClick={async () => { await deleteStep(st.id); router.refresh(); }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {steps.length === 0 && (
+                    <p className="text-xs text-ink-faint">No steps — this persona won&apos;t be contacted.</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          className={cn(btnGhost, "mt-3")}
+          onClick={async () => { await resetSequence(); router.refresh(); toast.success("Sequence reset to defaults"); }}
+        >
+          Reset to default sequence
+        </button>
+        <p className="mt-2 text-xs text-ink-faint">
+          Edits apply to newly drafted steps; anything already in your queue keeps its text.
+        </p>
+      </Section>
+
+      <Section title="Resumes">
+        <div className="space-y-2">
+          {resumes.map((r) => (
+            <div key={r.id} className="flex items-center gap-2 text-sm">
+              <button
+                title={r.isDefault ? "Default — attached to first emails" : "Make default"}
+                className={cn("shrink-0", r.isDefault ? "text-warn" : "text-ink-faint hover:text-warn")}
+                onClick={async () => { await setDefaultResume(r.id); router.refresh(); }}
+              >
+                {r.isDefault ? "★" : "☆"}
+              </button>
+              <span className="flex-1 truncate">
+                {r.name} <span className="text-xs text-ink-faint">({r.filename})</span>
+              </span>
+              <button
+                className="glass-pill px-2 py-0.5 text-[11px] text-ink-faint hover:text-bad"
+                onClick={async () => { await deleteResume(r.id); router.refresh(); toast.success("Resume deleted"); }}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+          {resumes.length === 0 && (
+            <p className="text-xs text-ink-faint">
+              No resume yet — upload one and it&apos;s attached to first-touch emails
+              (each campaign can override it on the Outreach page).
+            </p>
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className={btnGhost} disabled={uploadingResume} onClick={() => resumeRef.current?.click()}>
+            {uploadingResume ? "Uploading…" : "⬆ Upload resume (PDF)"}
+          </button>
+          <input
+            ref={resumeRef} type="file" accept=".pdf,.txt,.md" className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              setUploadingResume(true);
+              const fd = new FormData();
+              fd.set("file", f);
+              fd.set("name", f.name.replace(/\.(pdf|txt|md)$/i, ""));
+              const res = await uploadResume(fd);
+              setUploadingResume(false);
+              if (res.error) toast.error(res.error);
+              else {
+                toast.success(
+                  res.parsedChars
+                    ? "Resume uploaded — text extracted for personalization"
+                    : "Resume uploaded"
+                );
+                router.refresh();
+              }
+            }}
+          />
+          {s.resumeText && (
+            <span className="text-xs text-good">✓ text extracted — drafts use your real experience</span>
+          )}
+        </div>
+      </Section>
+
       <Section title="Gmail connection">
         {s.gmailConnected ? (
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm text-good">✓ Connected</span>
             <span className="text-xs text-ink-faint">
               Scans find recruiter replies & interview invites and turn them into
-              one-click suggestions. Drafts can be saved straight to Gmail.
+              one-click suggestions. Approved outreach sends from this address.
+              Connected before v3? Reconnect once to grant the send permission.
             </span>
-            <button className={cn(btnGhost, "ml-auto !text-bad")}
+            <a className={cn(btnGhost, "ml-auto")} href="/api/gmail/connect">Reconnect</a>
+            <button className={cn(btnGhost, "!text-bad")}
               onClick={async () => { await gmailDisconnect(); router.refresh(); toast.success("Gmail disconnected"); }}>
               Disconnect
             </button>
@@ -354,7 +582,7 @@ export function SettingsView({
               Connect Gmail
             </a>
             <span className="text-xs text-ink-faint">
-              Read-only inbox scanning + draft creation. Add
+              Inbox scanning, draft creation and approved-only sending. Add
               <code className="mx-1">/api/gmail/callback</code> to your Google OAuth
               redirect URIs first (see README).
             </span>
