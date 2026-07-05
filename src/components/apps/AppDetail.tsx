@@ -12,7 +12,9 @@ import {
   createTask, setTaskCompleted, deleteTask,
   createContact, unlinkContact, findApolloContacts,
 } from "@/actions/misc";
+import { startCampaignFor } from "@/actions/outreach";
 import { cn, faviconUrl, timeAgo, WORK_MODES, JOB_TYPES, INTERVIEW_FORMATS } from "@/lib/utils";
+import { DraftModal } from "./DraftModal";
 import type { AppFull, Stage, Source, Tag } from "@/lib/data";
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -43,6 +45,12 @@ export function AppDetail({
   const [showIvForm, setShowIvForm] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
   const [apolloBusy, setApolloBusy] = useState(false);
+  const [campaignBusy, setCampaignBusy] = useState(false);
+  const [draftFor, setDraftFor] = useState<
+    | { kind: "referral"; contact: { id: string; name: string; email: string | null } }
+    | { kind: "followup"; contact: null }
+    | null
+  >(null);
 
   async function patch(p: Parameters<typeof updateApplication>[1]) {
     await updateApplication(app.id, p);
@@ -83,6 +91,24 @@ export function AppDetail({
       onChanged();
     } finally {
       setApolloBusy(false);
+    }
+  }
+
+  async function startCampaign() {
+    setCampaignBusy(true);
+    try {
+      const res = await startCampaignFor(app.id);
+      if (res.created) {
+        toast.success("Campaign started — drafts are waiting in your Outreach queue", {
+          action: { label: "Open queue", onClick: () => router.push("/outreach") },
+        });
+      } else {
+        toast.error(res.reason || "Couldn't start a campaign");
+      }
+      onChanged();
+      router.refresh();
+    } finally {
+      setCampaignBusy(false);
     }
   }
 
@@ -329,6 +355,9 @@ export function AppDetail({
         <SectionTitle
           action={
             <span className="flex gap-3">
+              <button className="text-xs text-accent" onClick={startCampaign} disabled={campaignBusy}>
+                {campaignBusy ? "Preparing…" : "🚀 Start outreach"}
+              </button>
               <button className="text-xs text-accent" onClick={apollo} disabled={apolloBusy}>
                 {apolloBusy ? "Searching…" : "⚡ Find via Apollo"}
               </button>
@@ -352,6 +381,12 @@ export function AppDetail({
                   {[c.title, c.email].filter(Boolean).join(" · ")}
                 </div>
               </div>
+              <button
+                className="glass-pill shrink-0 px-2 py-1 text-[11px] text-accent hover:opacity-80"
+                onClick={() => setDraftFor({ kind: "referral", contact: { id: c.id, name: c.name, email: c.email } })}
+              >
+                ✨ Ask referral
+              </button>
               {c.linkedinUrl && (
                 <a className="text-xs text-accent" href={c.linkedinUrl} target="_blank" rel="noreferrer">in↗</a>
               )}
@@ -431,6 +466,9 @@ export function AppDetail({
           >
             ✉ Log follow-up
           </button>
+          <button className={btnGhost} onClick={() => setDraftFor({ kind: "followup", contact: null })}>
+            ✨ Draft follow-up
+          </button>
         </div>
         <div className="space-y-1.5">
           {app.activities.map((act) => (
@@ -459,6 +497,17 @@ export function AppDetail({
           Archive application
         </button>
       </div>
+
+      {draftFor && (
+        <DraftModal
+          open
+          onClose={() => setDraftFor(null)}
+          applicationId={app.id}
+          company={app.company}
+          kind={draftFor.kind}
+          contact={draftFor.contact}
+        />
+      )}
     </div>
   );
 }

@@ -298,6 +298,9 @@ export async function clearDemoData() {
   await db.delete(applications).where(eq(applications.demo, true));
   // demo contacts are marked via origin
   await db.delete(contacts).where(eq(contacts.origin, "demo"));
+  const { discovered } = await import("@/db");
+  const { like } = await import("drizzle-orm");
+  await db.delete(discovered).where(like(discovered.externalId, "demo-%"));
   revalidate();
 }
 

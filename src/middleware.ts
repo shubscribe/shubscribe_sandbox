@@ -10,5 +10,6 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|icon.svg).*)"],
+  // api/scan and api/tick guard themselves with CRON_SECRET (or a session)
+  matcher: ["/((?!api/auth|api/scan|api/tick|_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };

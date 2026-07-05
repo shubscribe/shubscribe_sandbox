@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { getDashboardData } from "@/lib/data";
 import { getSettings } from "@/lib/settings";
+import { db, suggestions, applications, stages } from "@/db";
+import { eq } from "drizzle-orm";
 import { DueTaskList, StaleList } from "@/components/dashboard/ActionLists";
+import { SuggestionList } from "@/components/dashboard/SuggestionList";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +17,25 @@ function greeting() {
 }
 
 export default async function DashboardPage() {
-  const [data, settings] = await Promise.all([getDashboardData(), getSettings()]);
+  const [data, settings, pendingSuggestions, allApps, allStages] = await Promise.all([
+    getDashboardData(),
+    getSettings(),
+    db.select().from(suggestions).where(eq(suggestions.status, "pending")),
+    db.select({ id: applications.id, company: applications.company }).from(applications),
+    db.select().from(stages),
+  ]);
+  const suggestionItems = pendingSuggestions.map((sg) => ({
+    id: sg.id,
+    kind: sg.kind,
+    subject: sg.subject,
+    fromAddr: sg.fromAddr,
+    snippet: sg.snippet,
+    app: sg.applicationId ? (allApps.find((a) => a.id === sg.applicationId) ?? null) : null,
+    proposedStageName: sg.proposedStageId
+      ? (allStages.find((st) => st.id === sg.proposedStageId)?.name ?? null)
+      : null,
+    proposedTask: sg.proposedTask,
+  }));
   const { stats } = data;
   const goalPct = Math.min(100, Math.round((stats.appliedThisWeek / Math.max(1, stats.weeklyGoal)) * 100));
   const maxFunnel = Math.max(1, ...data.funnel.map((f) => f.count));
@@ -41,6 +62,8 @@ export default async function DashboardPage() {
           {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
         </p>
       </div>
+
+      <SuggestionList items={suggestionItems} />
 
       {/* stat tiles */}
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -3,6 +3,7 @@
    and removable via Settings → Danger zone → "Clear demo data". */
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
+import { eq } from "drizzle-orm";
 import * as schema from "./schema";
 
 const client = createClient({
@@ -172,6 +173,85 @@ async function main() {
       });
     }
     count++;
+  }
+
+  /* demo discovered inbox rows (externalId prefixed demo- so "Clear demo data" removes them) */
+  await db.insert(schema.discovered).values([
+    {
+      source: "remotive", externalId: "demo-1",
+      company: "PostHog", title: "Full Stack Engineer - Product Analytics",
+      url: "https://posthog.com/careers", location: "Remote", remote: true,
+      salaryMin: 150000, salaryMax: 190000, currency: "USD",
+      description: "Ship features across our React/Node analytics platform. Strong TypeScript required.",
+      postedAt: new Date(now - 1 * DAY), fitScore: 86,
+      fitReason: "Strong overlap with full-stack TypeScript experience and product focus.",
+    },
+    {
+      source: "greenhouse", externalId: "demo-2",
+      company: "Stripe", title: "Frontend Engineer, Payments UI",
+      url: "https://stripe.com/jobs", location: "San Francisco, CA",
+      salaryMin: 165000, salaryMax: 215000, currency: "USD",
+      description: "Build the surfaces millions of businesses use to accept payments.",
+      postedAt: new Date(now - 2 * DAY), fitScore: 78,
+      fitReason: "Title matches target role; company already in your pipeline (different team).",
+    },
+    {
+      source: "hn", externalId: "demo-3",
+      company: "YC startup (stealth)", title: "Founding Engineer",
+      url: "https://news.ycombinator.com", location: "Remote",
+      description: "Seed-stage, building dev tools. Equity-heavy comp. React + Go stack.",
+      postedAt: new Date(now - 3 * DAY), fitScore: 55,
+      fitReason: "Interesting stack but comp structure and seniority are a stretch.",
+    },
+  ]);
+  console.log("• seeded 3 demo discovered jobs");
+
+  /* demo outreach campaign (cascades away with the demo application) */
+  const [linearApp] = await db
+    .select()
+    .from(schema.applications)
+    .where(eq(schema.applications.company, "Linear"));
+  if (linearApp) {
+    const campaignContacts = await db.insert(schema.contacts).values([
+      { name: "Jordan Blake", title: "Technical Recruiter", company: "Linear", email: "jordan@example.com", origin: "demo" },
+      { name: "Dev Patel", title: "Engineering Manager", company: "Linear", email: "dev@example.com", origin: "demo" },
+      { name: "Sofia Almeida", title: "Product Engineer", company: "Linear", email: "sofia@example.com", origin: "demo" },
+    ]).returning();
+
+    const [campaign] = await db.insert(schema.campaigns).values({
+      applicationId: linearApp.id,
+      status: "active",
+    }).returning();
+
+    const [leadRecruiter] = await db.insert(schema.leads).values({
+      campaignId: campaign.id, contactId: campaignContacts[0].id, persona: "recruiter", status: "active",
+    }).returning();
+    const [leadManager] = await db.insert(schema.leads).values({
+      campaignId: campaign.id, contactId: campaignContacts[1].id, persona: "manager", status: "replied",
+    }).returning();
+    const [leadPeer] = await db.insert(schema.leads).values({
+      campaignId: campaign.id, contactId: campaignContacts[2].id, persona: "peer", status: "active",
+    }).returning();
+
+    await db.insert(schema.outreachMessages).values([
+      {
+        leadId: leadRecruiter.id, stepPosition: 1, type: "email", status: "drafted",
+        subject: "Product Engineer application — quick intro",
+        body: "Hi Jordan,\n\nI applied for the Product Engineer role and wanted to introduce myself directly. I've spent the last few years building fast, polished product surfaces in React, and Linear's obsession with craft is exactly why I applied.\n\nWould you be open to a short chat about the role?\n\nThanks!",
+      },
+      {
+        leadId: leadPeer.id, stepPosition: 1, type: "email", status: "drafted",
+        subject: "Fellow product eng — question about the team",
+        body: "Hi Sofia,\n\nI'm in the pipeline for the Product Engineer opening and would love a peer's take: what's the part of the work that surprised you most after joining?\n\nAny insight would be hugely appreciated — happy to keep it to one reply!",
+      },
+      {
+        leadId: leadManager.id, stepPosition: 1, type: "email", status: "sent",
+        subject: "Interest in the Product Engineer opening",
+        body: "Hi Dev,\n\nI recently applied for the Product Engineer opening on your team. I've shipped dashboard and workflow surfaces used by millions and I'd love to bring that to Linear.\n\nWould you have 15 minutes this week?",
+        sentAt: new Date(now - 2 * DAY),
+      },
+    ]);
+    console.log("• seeded 1 demo outreach campaign (3 leads, 2 queued drafts, 1 sent + replied)");
   }
 
   /* one unlinked general task */
