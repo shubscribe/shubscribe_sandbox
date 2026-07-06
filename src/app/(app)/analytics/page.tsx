@@ -1,4 +1,4 @@
-import { db, activities, applications } from "@/db";
+import { db, activities, applications, sources, interviews, campaigns, leads } from "@/db";
 import { getStages } from "@/lib/data";
 import { getSettings } from "@/lib/settings";
 import { AnalyticsView } from "@/components/analytics/AnalyticsView";
@@ -13,11 +13,15 @@ function median(xs: number[]) {
 }
 
 export default async function AnalyticsPage() {
-  const [apps, stages, acts, settings] = await Promise.all([
+  const [apps, stages, acts, settings, allSources, allInterviews, allCampaigns, allLeads] = await Promise.all([
     db.select().from(applications),
     getStages(),
     db.select().from(activities),
     getSettings(),
+    db.select().from(sources),
+    db.select().from(interviews),
+    db.select().from(campaigns),
+    db.select().from(leads),
   ]);
 
   /* ---- applications per week (last 12 weeks) ---- */
@@ -94,6 +98,37 @@ export default async function AnalyticsPage() {
     })
     .filter((l): l is typeof l & { source: string; target: string } => !!l.source && !!l.target);
 
+  /* ---- v4: which sources actually convert to interviews ---- */
+  const interviewedAppIds = new Set(allInterviews.map((iv) => iv.applicationId));
+  const sourceStats = allSources
+    .map((src) => {
+      const srcApps = apps.filter((a) => a.sourceId === src.id);
+      const interviewed = srcApps.filter((a) => interviewedAppIds.has(a.id)).length;
+      return {
+        name: src.name,
+        color: src.color,
+        apps: srcApps.length,
+        interviewed,
+        rate: srcApps.length ? Math.round((interviewed / srcApps.length) * 100) : 0,
+      };
+    })
+    .filter((x) => x.apps > 0)
+    .sort((a, b) => b.rate - a.rate || b.apps - a.apps);
+
+  /* ---- v4: does outreach move the needle? ---- */
+  const repliedCampaignAppIds = new Set(
+    allLeads
+      .filter((l) => l.status === "replied")
+      .map((l) => allCampaigns.find((c) => c.id === l.campaignId)?.applicationId)
+      .filter((x): x is string => !!x)
+  );
+  const campaignAppIds = new Set(allCampaigns.map((c) => c.applicationId));
+  const outreachImpact = {
+    withCampaign: campaignAppIds.size,
+    gotReply: repliedCampaignAppIds.size,
+    replyToInterview: [...repliedCampaignAppIds].filter((id) => interviewedAppIds.has(id)).length,
+  };
+
   return (
     <AnalyticsView
       weeks={weeks}
@@ -101,6 +136,8 @@ export default async function AnalyticsPage() {
       velocity={velocity}
       sankeyLinks={sankeyLinks}
       totalApps={apps.length}
+      sourceStats={sourceStats}
+      outreachImpact={outreachImpact}
     />
   );
 }

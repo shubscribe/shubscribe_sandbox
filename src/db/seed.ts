@@ -251,6 +251,14 @@ async function main() {
         sentAt: new Date(now - 2 * DAY),
       },
     ]);
+    // a ready-to-copy LinkedIn DM task (what a dm_task sequence step produces)
+    await db.insert(schema.tasks).values({
+      applicationId: linearApp.id,
+      title: "Send LinkedIn DM to Jordan Blake",
+      notes: "Hi Jordan — I emailed a couple days ago about the Product Engineer opening. Just wanted to say hi here too; I've been building similar workflow tools for a few years and Linear is exactly where I'd love to do it next. Any chance of a quick chat?",
+      linkUrl: "https://linkedin.com/in/example",
+      dueAt: new Date(now + 1 * DAY),
+    });
     console.log("• seeded 1 demo outreach campaign (3 leads, 2 queued drafts, 1 sent + replied)");
   }
 

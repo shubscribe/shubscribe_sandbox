@@ -182,8 +182,13 @@ async function scoreFit(jobs: Job[]): Promise<Map<string, { score: number; reaso
   const out = new Map<string, { score: number; reason: string }>();
   if (!(await hasAiKey()) || jobs.length === 0) return out;
   const s = await getSettings();
-  const profile = [s.targetRole && `Target role: ${s.targetRole}`, s.profileBlurb && `About the candidate: ${s.profileBlurb}`]
-    .filter(Boolean).join("\n") || "Target role: software engineer";
+  const tastes = s.dismissTastes.split("\n").filter(Boolean).slice(-15);
+  const profile = [
+    s.targetRole && `Target role: ${s.targetRole}`,
+    s.profileBlurb && `About the candidate: ${s.profileBlurb}`,
+    tastes.length &&
+      `The candidate dismissed these recently (dismissal reason in parentheses) — score similar jobs lower:\n${tastes.join("\n")}`,
+  ].filter(Boolean).join("\n") || "Target role: software engineer";
 
   for (let i = 0; i < jobs.length; i += 8) {
     const batch = jobs.slice(i, i + 8);
@@ -248,26 +253,32 @@ export async function runScan(): Promise<ScanReport> {
     await collect(`${w.ats}:${w.company}`, () => fn(w.company, w.slug, w.keywords));
   }
 
-  /* dedupe: within batch, against previously discovered, against existing applications */
+  /* dedupe: within batch (by id AND by company+title across sources),
+     against previously discovered, against existing applications */
+  const jobKey = (company: string, title: string) =>
+    `${company.toLowerCase().trim()}|${title.toLowerCase().replace(/\s+/g, " ").trim()}`;
   const seen = new Set<string>();
+  const seenJobs = new Set<string>();
   const unique = all.filter((j) => {
     const k = `${j.source}:${j.externalId}`;
-    if (seen.has(k)) return false;
+    if (seen.has(k) || seenJobs.has(jobKey(j.company, j.title))) return false;
     seen.add(k);
+    seenJobs.add(jobKey(j.company, j.title));
     return true;
   });
-  const existingDiscovered = new Set(
-    (await db.select({ source: discovered.source, externalId: discovered.externalId }).from(discovered)).map(
-      (d) => `${d.source}:${d.externalId}`
-    )
-  );
+  const discoveredRows = await db
+    .select({ source: discovered.source, externalId: discovered.externalId, company: discovered.company, title: discovered.title })
+    .from(discovered);
+  const existingDiscovered = new Set(discoveredRows.map((d) => `${d.source}:${d.externalId}`));
+  const existingJobKeys = new Set(discoveredRows.map((d) => jobKey(d.company, d.title)));
   const apps = await db.select({ company: applications.company, title: applications.title }).from(applications);
-  const appKeys = new Set(apps.map((a) => `${a.company.toLowerCase()}|${a.title.toLowerCase()}`));
+  const appKeys = new Set(apps.map((a) => jobKey(a.company, a.title)));
 
   const fresh = unique.filter(
     (j) =>
       !existingDiscovered.has(`${j.source}:${j.externalId}`) &&
-      !appKeys.has(`${j.company.toLowerCase()}|${j.title.toLowerCase()}`)
+      !existingJobKeys.has(jobKey(j.company, j.title)) &&
+      !appKeys.has(jobKey(j.company, j.title))
   );
   report.found = unique.length;
 

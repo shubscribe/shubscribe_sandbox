@@ -37,6 +37,7 @@ export function TasksView({ tasks, apps }: { tasks: Task[]; apps: AppLite[] }) {
   const [appId, setAppId] = useState("");
   const [due, setDue] = useState("");
   const [showDone, setShowDone] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const open = tasks.filter((t) => !t.completedAt);
   const done = tasks.filter((t) => t.completedAt);
@@ -66,8 +67,9 @@ export function TasksView({ tasks, apps }: { tasks: Task[]; apps: AppLite[] }) {
 
   function row(t: Task, completed = false) {
     const app = t.applicationId ? appMap.get(t.applicationId) : null;
+    const isOpen = expanded.has(t.id);
     return (
-      <div key={t.id} className="glass group flex items-center gap-3 p-3">
+      <div key={t.id} className="glass group flex flex-wrap items-center gap-3 p-3">
         <input
           type="checkbox"
           checked={completed}
@@ -86,6 +88,18 @@ export function TasksView({ tasks, apps }: { tasks: Task[]; apps: AppLite[] }) {
             >
               {app.company} — {app.title}
             </Link>
+          )}
+          {t.notes && (
+            <button
+              className="mt-0.5 block text-xs text-accent hover:underline"
+              onClick={() => setExpanded((prev) => {
+                const next = new Set(prev);
+                if (next.has(t.id)) next.delete(t.id); else next.add(t.id);
+                return next;
+              })}
+            >
+              {isOpen ? "▾ hide message" : "▸ view message"}
+            </button>
           )}
         </div>
         {t.dueAt && (
@@ -113,6 +127,27 @@ export function TasksView({ tasks, apps }: { tasks: Task[]; apps: AppLite[] }) {
             >
               ✕
             </button>
+          </div>
+        )}
+        {t.notes && isOpen && (
+          <div className="w-full rounded-xl bg-accent-soft/40 p-3">
+            <p className="whitespace-pre-wrap text-sm text-ink-dim">{t.notes}</p>
+            <div className="mt-2 flex gap-2">
+              <button
+                className="glass-pill px-2.5 py-1 text-[11px] font-medium text-accent"
+                onClick={() => { navigator.clipboard.writeText(t.notes ?? ""); toast.success("Message copied — paste it into LinkedIn"); }}
+              >
+                ⧉ Copy message
+              </button>
+              {t.linkUrl && (
+                <a
+                  className="glass-pill px-2.5 py-1 text-[11px] font-medium text-accent"
+                  href={t.linkUrl} target="_blank" rel="noreferrer"
+                >
+                  Open LinkedIn ↗
+                </a>
+              )}
+            </div>
           </div>
         )}
       </div>

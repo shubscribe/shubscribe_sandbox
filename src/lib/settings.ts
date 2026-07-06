@@ -34,6 +34,12 @@ export type AppSettings = {
   outreachPaused: boolean;
   proofPoints: string; // newline-separated wins
   resumeText: string; // parsed text used for personalization
+  // v4
+  setupDismissed: boolean; // hide the dashboard setup checklist
+  dailyDigest: boolean; // morning summary email to self
+  lastDigestDay: string; // YYYY-MM-DD of last digest check
+  gmailAddress: string; // captured at connect time; digest recipient
+  dismissTastes: string; // newline log of "company — title (reason)" dismissals, feeds fit scoring
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -65,6 +71,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   outreachPaused: false,
   proofPoints: "",
   resumeText: "",
+  setupDismissed: false,
+  dailyDigest: true,
+  lastDigestDay: "",
+  gmailAddress: "",
+  dismissTastes: "",
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -75,7 +86,7 @@ export async function getSettings(): Promise<AppSettings> {
     ...Object.fromEntries(
       Object.entries(map).map(([k, v]) => {
         if (["weeklyGoal", "staleDays", "autoAddThreshold", "dailySendCap", "sendWindowStart", "sendWindowEnd"].includes(k)) return [k, Number(v)];
-        if (["onboarded", "gmailConnected", "outreachPaused"].includes(k)) return [k, v === "true"];
+        if (["onboarded", "gmailConnected", "outreachPaused", "setupDismissed", "dailyDigest"].includes(k)) return [k, v === "true"];
         return [k, v];
       })
     ),

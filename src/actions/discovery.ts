@@ -1,6 +1,6 @@
 "use server";
 
-import { db, searches, watchlist, suggestions, applications, stages, tasks, contacts, applicationContacts } from "@/db";
+import { db, searches, watchlist, suggestions, applications, stages, tasks, contacts, applicationContacts, discovered as discoveredTable } from "@/db";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "./applications";
@@ -8,7 +8,7 @@ import { findApolloContacts } from "./misc";
 import { runScan, runAutopilot, markDiscovered, type ScanReport, type AutopilotReport } from "@/lib/discovery";
 import { scanGmail, createGmailDraft, disconnectGmail, type GmailScanReport } from "@/lib/gmail";
 import { llmJson } from "@/lib/llm";
-import { getSettings } from "@/lib/settings";
+import { getSettings, setSettings } from "@/lib/settings";
 
 function revalidate() {
   revalidatePath("/", "layout");
@@ -91,7 +91,16 @@ export async function approveDiscovered(id: string): Promise<{ applicationId?: s
   return res;
 }
 
-export async function dismissDiscovered(id: string) {
+export async function dismissDiscovered(id: string, reason?: string) {
+  if (reason) {
+    const [row] = await db.select().from(discoveredTable).where(eq(discoveredTable.id, id));
+    if (row) {
+      const s = await getSettings();
+      const line = `${row.company} — ${row.title} (${reason})`;
+      const lines = [...s.dismissTastes.split("\n").filter(Boolean), line].slice(-30);
+      await setSettings({ dismissTastes: lines.join("\n") });
+    }
+  }
   await markDiscovered(id, "dismissed");
   revalidate();
 }

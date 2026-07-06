@@ -29,6 +29,9 @@ built with Next.js, Turso (SQLite), and Drizzle.
 - **v3: outreach autopilot** — high-fit jobs auto-added, leads found per persona,
   messages drafted and queued; you approve, it sends from your Gmail with pacing
   and stop rules ([details](#v3--outreach-autopilot)).
+- **v4: daily driver** — reply-safe sending, dashboard briefing with inline
+  approvals, mobile bottom nav + installable PWA, AI interview prep packs,
+  taste-learning fit scores, daily digest email ([details](#v4--the-daily-driver-update)).
 
 ## Quick start (local)
 
@@ -198,6 +201,54 @@ outreach** in the contacts section).
 **Queue** (edit/approve/skip drafts) · **Campaigns** (per-company progress,
 pause/stop, resume override) · **Analytics** (sends, replies, which persona
 actually answers) · **History** (every sent message, linked to its Gmail thread).
+
+## V4 — the daily driver update
+
+V4 is a product pass over v1–v3: tighter trust guarantees, a morning ritual, a
+real mobile experience, and features for the moment that matters most — the
+interview. All additive, as always.
+
+### Trust guarantees
+- **Never bump someone who replied**: every tick re-checks Gmail for replies
+  *before* releasing any send. If the reply check fails, sends wait — no risk of
+  an embarrassing follow-up landing after an answer.
+- **LinkedIn DM steps are one-tap**: the task now carries the full drafted
+  message (⧉ Copy) and a direct link to the lead's LinkedIn profile.
+
+### The morning ritual
+- **Dashboard briefing** — drafts waiting for approval (approve/skip inline,
+  without leaving the dashboard), top new job matches with one-click add, plus
+  the existing suggestions, interviews, and due tasks.
+- **Setup checklist** — a dismissible card that shows exactly what's configured
+  and what each missing key unlocks.
+- **Daily digest email** — the morning tick emails you a summary (drafts to
+  approve, new matches, tasks due) via your own Gmail, only when something is
+  actually waiting. Toggle in Settings → Outreach autopilot. Reconnect Gmail
+  once so the app can learn your address.
+
+### Mobile + PWA
+- Bottom tab bar on phones (Home / Apps / Discover / Outreach / More) with
+  badges, plus a More sheet for the rest.
+- Installable: open the site on your phone → "Add to Home Screen" — it runs
+  standalone like a native app.
+
+### Interview prep kit
+- When an application reaches an interviewing stage, the autopilot generates a
+  **prep pack**: company & role brief, likely questions from the JD, which of
+  YOUR stories to tell for each, questions to ask, and red flags to avoid.
+- Also on demand: **✨ Generate** in the application's "Interview prep" section.
+- A "Review prep pack" task lands the day before your next round.
+
+### The machine learns
+- **Dismiss with a reason** on Discover (too senior, wrong stack, salary…) —
+  future fit scoring reads your last 30 dismissals and scores similar jobs lower.
+- **Cross-source dedupe** — the same job from two boards only shows up once.
+- **Analytics that answer questions**: which sources convert to interviews
+  (not just applications), and whether outreach replies actually turn into
+  interviews.
+
+Upgrading from v3? Run `npm run db:push` once (new columns: task notes/links,
+application prep packs) and redeploy.
 
 ## Roadmap hooks still open
 

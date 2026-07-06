@@ -1,12 +1,12 @@
 import "server-only";
 import {
   db, applications, contacts, applicationContacts, campaigns, leads,
-  outreachMessages, sequenceSteps, resumes, suggestions, tasks, activities,
+  outreachMessages, sequenceSteps, resumes, suggestions, tasks, activities, discovered,
 } from "@/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { getSettings } from "./settings";
+import { getSettings, setSettings, type AppSettings } from "./settings";
 import { llmJson, hasAiKey } from "./llm";
-import { sendGmail } from "./gmail";
+import { sendGmail, gmailSearchMessages } from "./gmail";
 
 export type Persona = "recruiter" | "manager" | "peer";
 
@@ -179,12 +179,75 @@ async function leadIsStopped(lead: typeof leads.$inferSelect, campaign: typeof c
 }
 
 export type TickReport = {
-  sent: number; dmTasks: number; drafted: number; cancelled: number; skipped?: string;
+  sent: number; dmTasks: number; drafted: number; cancelled: number;
+  replies?: number; digest?: boolean; prepPacks?: number; skipped?: string;
 };
+
+/** Morning summary to the user's own inbox — once a day, only if something is waiting. */
+async function maybeSendDailyDigest(s: AppSettings): Promise<boolean> {
+  if (!s.dailyDigest || !s.gmailConnected || !s.gmailAddress) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  if (s.lastDigestDay === today || new Date().getHours() < 8) return false;
+
+  const [allMsgs, allDiscovered, allSugs, allTasks] = await Promise.all([
+    db.select().from(outreachMessages),
+    db.select().from(discovered),
+    db.select().from(suggestions),
+    db.select().from(tasks),
+  ]);
+  const queue = allMsgs.filter((m) => m.status === "drafted").length;
+  const newJobs = allDiscovered.filter((d) => d.status === "new");
+  const pending = allSugs.filter((x) => x.status === "pending").length;
+  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+  const dueToday = allTasks.filter((t) => !t.completedAt && t.dueAt && t.dueAt <= endOfToday).length;
+
+  // mark the day even when there's nothing — one check per day, no empty emails
+  await setSettings({ lastDigestDay: today });
+  if (queue + newJobs.length + pending + dueToday === 0) return false;
+
+  const topJobs = [...newJobs]
+    .sort((a, b) => (b.fitScore ?? 0) - (a.fitScore ?? 0))
+    .slice(0, 3)
+    .map((d) => `  • ${d.title} at ${d.company}${d.fitScore != null ? ` (fit ${d.fitScore})` : ""}`);
+  const lines = [
+    "Your job-search briefing:",
+    "",
+    queue > 0 ? `✉ ${queue} outreach draft${queue === 1 ? "" : "s"} waiting for your approval` : null,
+    pending > 0 ? `📥 ${pending} inbox suggestion${pending === 1 ? "" : "s"} to review` : null,
+    dueToday > 0 ? `☑ ${dueToday} task${dueToday === 1 ? "" : "s"} due today` : null,
+    newJobs.length > 0 ? `◈ ${newJobs.length} new job match${newJobs.length === 1 ? "" : "es"}:` : null,
+    ...topJobs,
+    "",
+    "Open Mission Control to act on these.",
+  ].filter((l): l is string => l !== null);
+
+  try {
+    await sendGmail(s.gmailAddress, `☀️ ${queue > 0 ? `${queue} drafts to approve` : `${newJobs.length + pending + dueToday} things waiting`} — job search briefing`, lines.join("\n"));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function runTick(): Promise<TickReport> {
   const s = await getSettings();
   const report: TickReport = { sent: 0, dmTasks: 0, drafted: 0, cancelled: 0 };
+
+  /* 0) reply check FIRST — never draft or send a bump to someone who already answered.
+     Runs before data is fetched so the rest of the tick sees fresh lead statuses. */
+  if (s.gmailConnected) {
+    try {
+      report.replies = await detectReplies(gmailSearchMessages);
+    } catch {
+      // Gmail hiccup — skip sends this tick rather than risk a double-send
+      report.skipped = "reply check failed; sends deferred";
+      return report;
+    }
+  }
+
+  /* 0.5) morning digest to self (independent of the send window) */
+  report.digest = await maybeSendDailyDigest(s);
+
   const allCampaigns = await db.select().from(campaigns);
   const allLeads = await db.select().from(leads);
   const allMsgs = await db.select().from(outreachMessages);
@@ -208,6 +271,14 @@ export async function runTick(): Promise<TickReport> {
       const id = await draftMessage(lead.id, nextPos);
       if (id) report.drafted++;
     }
+  }
+
+  /* 1.5) autopilot prep packs for interviewing-stage apps (one per tick) */
+  try {
+    const { autoPrepTick } = await import("./prep");
+    report.prepPacks = await autoPrepTick();
+  } catch {
+    // prep generation is best-effort
   }
 
   /* 2) release approved messages within window + cap */
@@ -243,6 +314,8 @@ export async function runTick(): Promise<TickReport> {
       await db.insert(tasks).values({
         applicationId: campaign.applicationId,
         title: `Send LinkedIn DM to ${contact?.name ?? "lead"}`,
+        notes: msg.body,
+        linkUrl: contact?.linkedinUrl ?? null,
         dueAt: new Date(Date.now() + 86400000),
       });
       await db.insert(activities).values({

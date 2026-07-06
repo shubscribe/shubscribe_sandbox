@@ -49,6 +49,7 @@ export function DiscoverView({
   const [searchDraft, setSearchDraft] = useState({ name: "", keywords: "", location: "", remoteOnly: false, salaryMin: "" });
   const [watchDraft, setWatchDraft] = useState({ company: "", ats: "greenhouse" as "greenhouse" | "lever", slug: "", keywords: "" });
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [reasonFor, setReasonFor] = useState<string | null>(null);
 
   async function scan() {
     setScanning(true);
@@ -82,11 +83,14 @@ export function DiscoverView({
     });
   }
 
-  async function dismiss(j: Discovered) {
-    await dismissDiscovered(j.id);
+  async function dismiss(j: Discovered, reason?: string) {
+    setReasonFor(null);
+    await dismissDiscovered(j.id, reason);
     router.refresh();
-    toast(`Dismissed ${j.company}`);
+    toast(reason ? `Dismissed — future scoring will avoid "${reason}"` : `Dismissed ${j.company}`);
   }
+
+  const DISMISS_REASONS = ["not interested", "too senior", "too junior", "wrong stack", "location", "salary", "company"];
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -164,11 +168,24 @@ export function DiscoverView({
                       </button>
                       <button
                         className="glass-pill px-3 py-1.5 text-xs text-ink-faint hover:text-bad"
-                        onClick={() => dismiss(j)}
+                        onClick={() => setReasonFor(reasonFor === j.id ? null : j.id)}
                       >
                         ✕
                       </button>
                     </div>
+                    {reasonFor === j.id && (
+                      <div className="flex max-w-52 flex-wrap justify-end gap-1 pop-in">
+                        {DISMISS_REASONS.map((r) => (
+                          <button
+                            key={r}
+                            className="glass-pill px-2 py-0.5 text-[10px] text-ink-dim hover:text-bad"
+                            onClick={() => dismiss(j, r === "not interested" ? undefined : r)}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex gap-2 text-[11px]">
                       {j.description && (
                         <button className="text-ink-faint hover:text-ink" onClick={() => setExpanded(expanded === j.id ? null : j.id)}>

@@ -51,6 +51,7 @@ export const applications = sqliteTable("applications", {
   appliedAt: integer("applied_at", { mode: "timestamp_ms" }),
   notes: text("notes"),
   jdText: text("jd_text"), // raw job description for reference / re-extraction
+  prepPack: text("prep_pack"), // v4: AI interview prep, generated when stage hits Interviewing
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
   demo: integer("demo", { mode: "boolean" }).notNull().default(false),
   lastActivityAt: integer("last_activity_at", { mode: "timestamp_ms" }).$defaultFn(
@@ -93,6 +94,8 @@ export const tasks = sqliteTable("tasks", {
     onDelete: "cascade",
   }),
   title: text("title").notNull(),
+  notes: text("notes"), // e.g. full DM text ready to copy
+  linkUrl: text("link_url"), // e.g. the lead's LinkedIn profile
   dueAt: integer("due_at", { mode: "timestamp_ms" }),
   completedAt: integer("completed_at", { mode: "timestamp_ms" }),
   createdAt: now(),

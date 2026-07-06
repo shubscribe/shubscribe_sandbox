@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { getDashboardData } from "@/lib/data";
 import { getSettings } from "@/lib/settings";
-import { db, suggestions, applications, stages } from "@/db";
+import {
+  db, suggestions, applications, stages,
+  outreachMessages, leads, campaigns, contacts, discovered, searches, resumes,
+} from "@/db";
 import { eq } from "drizzle-orm";
 import { DueTaskList, StaleList } from "@/components/dashboard/ActionLists";
 import { SuggestionList } from "@/components/dashboard/SuggestionList";
+import { SetupChecklist, QueuePreview, MatchesPreview } from "@/components/dashboard/Briefing";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +21,56 @@ function greeting() {
 }
 
 export default async function DashboardPage() {
-  const [data, settings, pendingSuggestions, allApps, allStages] = await Promise.all([
+  const [
+    data, settings, pendingSuggestions, allApps, allStages,
+    draftedMsgs, allLeads, allCampaigns, allContacts, newDiscovered, searchRows, resumeRows,
+  ] = await Promise.all([
     getDashboardData(),
     getSettings(),
     db.select().from(suggestions).where(eq(suggestions.status, "pending")),
     db.select({ id: applications.id, company: applications.company }).from(applications),
     db.select().from(stages),
+    db.select().from(outreachMessages).where(eq(outreachMessages.status, "drafted")),
+    db.select().from(leads),
+    db.select().from(campaigns),
+    db.select().from(contacts),
+    db.select().from(discovered).where(eq(discovered.status, "new")),
+    db.select({ id: searches.id }).from(searches),
+    db.select({ id: resumes.id }).from(resumes),
   ]);
+
+  /* briefing: drafts waiting */
+  const leadMap = new Map(allLeads.map((l) => [l.id, l]));
+  const campaignMap = new Map(allCampaigns.map((c) => [c.id, c]));
+  const contactMap = new Map(allContacts.map((c) => [c.id, c]));
+  const appCompany = new Map(allApps.map((a) => [a.id, a.company]));
+  const queueItems = draftedMsgs.slice(0, 3).map((m) => {
+    const lead = leadMap.get(m.leadId);
+    const campaign = lead ? campaignMap.get(lead.campaignId) : undefined;
+    return {
+      id: m.id, subject: m.subject, body: m.body, type: m.type,
+      contactName: (lead && contactMap.get(lead.contactId)?.name) ?? "lead",
+      persona: lead?.persona ?? "",
+      company: (campaign && appCompany.get(campaign.applicationId)) ?? "",
+    };
+  });
+
+  /* briefing: top new matches */
+  const matchItems = [...newDiscovered]
+    .sort((a, b) => (b.fitScore ?? 0) - (a.fitScore ?? 0))
+    .slice(0, 3)
+    .map((d) => ({ id: d.id, company: d.company, title: d.title, fitScore: d.fitScore, source: d.source }));
+
+  /* setup checklist */
+  const setupItems = [
+    { label: "Set your target role", done: !!settings.targetRole, href: "/settings", hint: "matching quality" },
+    { label: "Add an AI key", done: !!settings.aiProvider && !!settings.aiApiKey, href: "/settings", hint: "fit scores & drafts" },
+    { label: "Add your Apollo key", done: !!settings.apolloApiKey, href: "/settings", hint: "finds leads" },
+    { label: "Connect Gmail", done: settings.gmailConnected, href: "/settings", hint: "replies & sending" },
+    { label: "Write your profile blurb", done: !!settings.profileBlurb, href: "/settings", hint: "powers every draft" },
+    { label: "Upload a resume", done: resumeRows.length > 0, href: "/settings", hint: "attached to first emails" },
+    { label: "Create a saved search", done: searchRows.length > 0, href: "/discover", hint: "finds jobs daily" },
+  ];
   const suggestionItems = pendingSuggestions.map((sg) => ({
     id: sg.id,
     kind: sg.kind,
@@ -63,7 +110,16 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {!settings.setupDismissed && <SetupChecklist items={setupItems} />}
+
       <SuggestionList items={suggestionItems} />
+
+      {(queueItems.length > 0 || matchItems.length > 0) && (
+        <div className="mb-5 grid gap-5 lg:grid-cols-2">
+          <QueuePreview items={queueItems} total={draftedMsgs.length} />
+          <MatchesPreview items={matchItems} total={newDiscovered.length} />
+        </div>
+      )}
 
       {/* stat tiles */}
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
