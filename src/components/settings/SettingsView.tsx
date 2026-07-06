@@ -400,6 +400,18 @@ export function SettingsView({
               ))}
             </select>
           </Field>
+          <Field label="Morning digest email" className="col-span-2">
+            <label className="flex items-center gap-2 text-sm text-ink-dim">
+              <input
+                type="checkbox"
+                checked={s.dailyDigest}
+                onChange={(e) => persist({ dailyDigest: e.target.checked })}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              Email me a summary each morning when drafts, matches or tasks are waiting
+              (sent to your connected Gmail address)
+            </label>
+          </Field>
           <Field label="Proof points (one per line — fed into every draft)" className="col-span-2">
             <textarea className={cn(inputCls, "h-24 resize-y")}
               placeholder={"e.g.\nCut page load 40% at Acme\nLed migration to React 19 for 2M-user app"}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Field, Chip, Stars, CompanyLogo, inputCls, btnGhost } from "@/components/ui/bits";
 import {
-  updateApplication, moveStage, setExcitement, setArchived, addNote, logFollowUp,
+  updateApplication, moveStage, setExcitement, setArchived, addNote, logFollowUp, generatePrep,
 } from "@/actions/applications";
 import {
   createInterview, updateInterview, deleteInterview,
@@ -46,6 +46,7 @@ export function AppDetail({
   const [showContactForm, setShowContactForm] = useState(false);
   const [apolloBusy, setApolloBusy] = useState(false);
   const [campaignBusy, setCampaignBusy] = useState(false);
+  const [prepBusy, setPrepBusy] = useState(false);
   const [draftFor, setDraftFor] = useState<
     | { kind: "referral"; contact: { id: string; name: string; email: string | null } }
     | { kind: "followup"; contact: null }
@@ -91,6 +92,18 @@ export function AppDetail({
       onChanged();
     } finally {
       setApolloBusy(false);
+    }
+  }
+
+  async function prep() {
+    setPrepBusy(true);
+    try {
+      const res = await generatePrep(app.id);
+      if (res.error) toast.error(res.error);
+      else toast.success("Prep pack ready — review it below");
+      onChanged();
+    } finally {
+      setPrepBusy(false);
     }
   }
 
@@ -224,6 +237,39 @@ export function AppDetail({
           </div>
         </div>
       )}
+
+      {/* interview prep pack */}
+      <div>
+        <SectionTitle
+          action={
+            <span className="flex gap-3">
+              {app.prepPack && (
+                <button
+                  className="text-xs text-accent"
+                  onClick={() => { navigator.clipboard.writeText(app.prepPack ?? ""); toast.success("Prep pack copied"); }}
+                >
+                  ⧉ Copy
+                </button>
+              )}
+              <button className="text-xs text-accent" onClick={prep} disabled={prepBusy}>
+                {prepBusy ? "Thinking…" : app.prepPack ? "↻ Regenerate" : "✨ Generate"}
+              </button>
+            </span>
+          }
+        >
+          Interview prep
+        </SectionTitle>
+        {app.prepPack ? (
+          <div className="glass max-h-72 overflow-y-auto p-3 thin-scroll">
+            <p className="whitespace-pre-wrap text-xs leading-relaxed text-ink-dim">{app.prepPack}</p>
+          </div>
+        ) : (
+          <p className="text-xs text-ink-faint">
+            A tailored prep pack — company brief, likely questions, which of your stories to tell —
+            generates automatically when this application reaches an interviewing stage, or on demand.
+          </p>
+        )}
+      </div>
 
       {/* interviews */}
       <div>

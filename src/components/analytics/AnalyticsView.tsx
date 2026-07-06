@@ -9,6 +9,8 @@ import { sankey, sankeyLinkHorizontal, type SankeyNode } from "d3-sankey";
 type Week = { label: string; count: number };
 type Velocity = { name: string; color: string; medianDays: number; samples: number };
 type Flow = { source: string; sourceColor: string; target: string; targetColor: string; value: number };
+type SourceStat = { name: string; color: string; apps: number; interviewed: number; rate: number };
+type OutreachImpact = { withCampaign: number; gotReply: number; replyToInterview: number };
 
 function GlassTooltip({
   active, payload, label,
@@ -27,13 +29,15 @@ function GlassTooltip({
 }
 
 export function AnalyticsView({
-  weeks, weeklyGoal, velocity, sankeyLinks, totalApps,
+  weeks, weeklyGoal, velocity, sankeyLinks, totalApps, sourceStats = [], outreachImpact,
 }: {
   weeks: Week[];
   weeklyGoal: number;
   velocity: Velocity[];
   sankeyLinks: Flow[];
   totalApps: number;
+  sourceStats?: SourceStat[];
+  outreachImpact?: OutreachImpact;
 }) {
   const maxVelocity = Math.max(1, ...velocity.map((v) => v.medianDays));
 
@@ -131,6 +135,59 @@ export function AnalyticsView({
           </div>
         )}
       </section>
+
+      {/* v4: source → interview conversion */}
+      {sourceStats.length > 0 && (
+        <section className="glass p-5">
+          <h2 className="mb-1 text-sm font-semibold">Which sources get you interviews</h2>
+          <p className="mb-4 text-xs text-ink-faint">
+            Conversion from application to at least one interview, per source
+          </p>
+          <div className="space-y-2.5">
+            {sourceStats.map((src) => (
+              <div key={src.name} title={`${src.interviewed} of ${src.apps} applications reached an interview`}>
+                <div className="mb-0.5 flex items-baseline justify-between text-xs">
+                  <span className="text-ink-dim">{src.name}</span>
+                  <span className="num text-ink">
+                    {src.rate}% <span className="text-ink-faint">· {src.interviewed}/{src.apps}</span>
+                  </span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-[4px] bg-line/60">
+                  <div
+                    className="h-full rounded-[4px]"
+                    style={{ width: `${Math.max(src.rate > 0 ? 4 : 0, src.rate)}%`, backgroundColor: src.color }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-ink-faint">
+            Double down on the sources at the top — they earn interviews, not just applications.
+          </p>
+        </section>
+      )}
+
+      {/* v4: outreach impact */}
+      {outreachImpact && outreachImpact.withCampaign > 0 && (
+        <section className="glass p-5">
+          <h2 className="mb-1 text-sm font-semibold">Does outreach move the needle?</h2>
+          <p className="mb-4 text-xs text-ink-faint">The campaign funnel, end to end</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="glass p-3 text-center">
+              <div className="num text-2xl font-semibold">{outreachImpact.withCampaign}</div>
+              <div className="mt-0.5 text-xs text-ink-dim">apps with campaigns</div>
+            </div>
+            <div className="glass p-3 text-center">
+              <div className="num text-2xl font-semibold">{outreachImpact.gotReply}</div>
+              <div className="mt-0.5 text-xs text-ink-dim">got a reply</div>
+            </div>
+            <div className="glass p-3 text-center">
+              <div className="num text-2xl font-semibold">{outreachImpact.replyToInterview}</div>
+              <div className="mt-0.5 text-xs text-ink-dim">reply → interview</div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* sankey */}
       <section className="glass p-5">

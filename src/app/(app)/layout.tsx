@@ -5,6 +5,7 @@ import { getStages, getSources, getTags, getApplications } from "@/lib/data";
 import { db, discovered, suggestions, outreachMessages } from "@/db";
 import { eq } from "drizzle-orm";
 import { Sidebar } from "@/components/shell/Sidebar";
+import { BottomNav } from "@/components/shell/BottomNav";
 import { GlobalUI } from "@/components/shell/GlobalUI";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -33,7 +34,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         discoverCount={newDiscovered.length + pendingSuggestions.length}
         outreachCount={draftedMsgs.length}
       />
-      <main className="min-w-0 flex-1 px-4 pb-24 pt-6 md:px-8">{children}</main>
+      <main className="min-w-0 flex-1 px-4 pb-32 pt-6 md:px-8 md:pb-24">{children}</main>
+      <BottomNav
+        discoverCount={newDiscovered.length + pendingSuggestions.length}
+        outreachCount={draftedMsgs.length}
+      />
       <GlobalUI
         stages={stages}
         sources={sources}

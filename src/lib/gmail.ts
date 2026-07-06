@@ -36,6 +36,14 @@ export async function exchangeGmailCode(code: string, origin: string) {
     ...(data.refresh_token ? { gmailRefreshToken: data.refresh_token } : {}),
     gmailTokenExpiry: String(Date.now() + data.expires_in * 1000 - 60000),
   });
+
+  // capture the account's address — the daily digest is sent to it
+  try {
+    const profile = (await gmailGet("profile")) as { emailAddress?: string };
+    if (profile.emailAddress) await setSettings({ gmailAddress: profile.emailAddress });
+  } catch {
+    // non-fatal; digest simply stays off until a reconnect
+  }
 }
 
 async function accessToken(): Promise<string> {

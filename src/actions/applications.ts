@@ -132,6 +132,13 @@ export async function moveStage(id: string, toStageId: string) {
   return { fromStageId: app.stageId };
 }
 
+export async function generatePrep(id: string): Promise<{ ok?: true; error?: string }> {
+  const { generatePrepPack } = await import("@/lib/prep");
+  const res = await generatePrepPack(id);
+  revalidate();
+  return res;
+}
+
 export async function setExcitement(id: string, excitement: number | null) {
   await db
     .update(applications)

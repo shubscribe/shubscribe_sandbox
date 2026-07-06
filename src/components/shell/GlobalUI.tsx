@@ -174,7 +174,7 @@ export function GlobalUI({
       {/* floating quick-add */}
       <button
         onClick={() => setAddOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-white shadow-xl transition hover:scale-105 active:scale-95"
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-white shadow-xl transition hover:scale-105 active:scale-95 md:bottom-6 md:right-6"
         title="Add application (N)"
         aria-label="Add application"
       >

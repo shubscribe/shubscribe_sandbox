@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
@@ -17,6 +17,18 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Mission Control — Job Tracker",
   description: "Personal job application tracker and mission control dashboard",
+  manifest: "/manifest.json",
+  icons: { apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Mission Control" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0c1a" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f4fb" },
+  ],
 };
 
 export default function RootLayout({
