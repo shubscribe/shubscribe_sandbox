@@ -7,8 +7,9 @@ export type AppSettings = {
   weeklyGoal: number;
   staleDays: number;
   onboarded: boolean;
-  aiProvider: "gemini" | "anthropic" | "openai" | "";
+  aiProvider: "gemini" | "anthropic" | "openai" | "openrouter" | "";
   aiApiKey: string;
+  aiModel: string; // used by openrouter/openai; blank = provider default
   apolloApiKey: string;
   // email parsing (phase 2 stub)
   emailLabel: string;
@@ -50,6 +51,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   onboarded: false,
   aiProvider: "",
   aiApiKey: "",
+  aiModel: "",
   apolloApiKey: "",
   emailLabel: "",
   emailMode: "suggest",

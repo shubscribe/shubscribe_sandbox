@@ -283,6 +283,7 @@ export function SettingsView({
             >
               <option value="">Off</option>
               <option value="gemini">Gemini (free tier)</option>
+              <option value="openrouter">OpenRouter</option>
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
             </select>
@@ -294,6 +295,22 @@ export function SettingsView({
               onBlur={(e) => e.target.value && persist({ aiApiKey: e.target.value })}
             />
           </Field>
+          {(s.aiProvider === "openrouter" || s.aiProvider === "openai") && (
+            <Field label={`Model ${s.aiProvider === "openrouter" ? "(e.g. openai/gpt-4o-mini)" : "(optional)"}`} className="col-span-3">
+              <input
+                className={inputCls}
+                placeholder={
+                  s.aiModel
+                    ? s.aiModel
+                    : s.aiProvider === "openrouter"
+                      ? "openai/gpt-4o-mini — or any model id from openrouter.ai/models"
+                      : "gpt-4o-mini"
+                }
+                defaultValue={s.aiModel}
+                onBlur={(e) => e.target.value !== s.aiModel && persist({ aiModel: e.target.value })}
+              />
+            </Field>
+          )}
         </div>
         <div className="mt-3">
           <Field label="Apollo.io API key (contact finding)">
@@ -306,7 +323,10 @@ export function SettingsView({
         </div>
         <p className="mt-2 text-xs text-ink-faint">
           Keys are stored in your own database and only used server-side. AI key powers
-          paste-text extraction; Apollo key powers &ldquo;Find contacts&rdquo; on applications.
+          paste-text extraction, fit scores and outreach drafts; Apollo key powers
+          &ldquo;Find contacts&rdquo; and lead generation. For OpenRouter, grab a key at
+          openrouter.ai/keys and pick a model at openrouter.ai/models (append
+          <code className="mx-1">:free</code> for free ones).
         </p>
       </Section>
 
