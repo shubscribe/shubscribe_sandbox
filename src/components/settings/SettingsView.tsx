@@ -15,6 +15,8 @@ import {
   uploadResume, setDefaultResume, deleteResume,
 } from "@/actions/outreach";
 import { Field, Chip, inputCls, btnGhost } from "@/components/ui/bits";
+import { ApiKeyField } from "./ApiKeyField";
+import { testAi, testApollo, testAdzuna, testJsearch } from "@/actions/diagnostics";
 import { cn, STAGE_COLORS } from "@/lib/utils";
 import type { AppSettings } from "@/lib/settings";
 import type { Stage, Source, Tag } from "@/lib/data";
@@ -273,80 +275,112 @@ export function SettingsView({
         </div>
       </Section>
 
-      <Section title="Integrations">
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="AI provider">
-            <select
-              className={inputCls}
-              value={s.aiProvider}
-              onChange={(e) => persist({ aiProvider: e.target.value as AppSettings["aiProvider"] })}
-            >
-              <option value="">Off</option>
-              <option value="gemini">Gemini (free tier)</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="openai">OpenAI</option>
-            </select>
-          </Field>
-          <Field label="AI API key" className="col-span-2">
-            <input
-              type="password" className={inputCls}
-              placeholder={s.aiApiKey ? "••••••••  (saved)" : "paste key"}
-              onBlur={(e) => e.target.value && persist({ aiApiKey: e.target.value })}
-            />
-          </Field>
-          {(s.aiProvider === "openrouter" || s.aiProvider === "openai") && (
-            <Field label={`Model ${s.aiProvider === "openrouter" ? "(e.g. openai/gpt-4o-mini)" : "(optional)"}`} className="col-span-3">
-              <input
-                className={inputCls}
-                placeholder={
-                  s.aiModel
-                    ? s.aiModel
-                    : s.aiProvider === "openrouter"
-                      ? "openai/gpt-4o-mini — or any model id from openrouter.ai/models"
-                      : "gpt-4o-mini"
-                }
-                defaultValue={s.aiModel}
-                onBlur={(e) => e.target.value !== s.aiModel && persist({ aiModel: e.target.value })}
-              />
-            </Field>
-          )}
+      <Section title="AI & integrations">
+        <div className="space-y-5">
+          {/* AI provider + active indicator */}
+          <div>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="AI provider" className="w-48">
+                <select
+                  className={inputCls}
+                  value={s.aiProvider}
+                  onChange={(e) => persist({ aiProvider: e.target.value as AppSettings["aiProvider"] })}
+                >
+                  <option value="">Off</option>
+                  <option value="gemini">Gemini (free tier)</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </Field>
+              <div className="pb-2.5">
+                {s.aiProvider ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-good">
+                    <span className="h-1.5 w-1.5 rounded-full bg-good" />
+                    Active: {s.aiProvider}
+                    {(s.aiProvider === "openrouter" || s.aiProvider === "openai") && s.aiModel
+                      ? ` · ${s.aiModel}`
+                      : s.aiProvider === "gemini" ? " · gemini-2.5-flash"
+                      : s.aiProvider === "anthropic" ? " · claude-haiku-4-5"
+                      : s.aiProvider === "openai" ? " · gpt-4o-mini" : ""}
+                  </span>
+                ) : (
+                  <span className="text-xs text-ink-faint">AI is off — fit scores & drafts are disabled.</span>
+                )}
+              </div>
+            </div>
+
+            {s.aiProvider && (
+              <div className="mt-3">
+                <ApiKeyField
+                  label="AI API key"
+                  saved={!!s.aiApiKey}
+                  onSave={(v) => persist({ aiApiKey: v })}
+                  onTest={testAi}
+                />
+              </div>
+            )}
+
+            {(s.aiProvider === "openrouter" || s.aiProvider === "openai") && (
+              <Field
+                label={s.aiProvider === "openrouter" ? "Model (required — e.g. openai/gpt-4o-mini)" : "Model (optional)"}
+                className="mt-3"
+              >
+                <input
+                  className={inputCls}
+                  placeholder={
+                    s.aiModel
+                      ? s.aiModel
+                      : s.aiProvider === "openrouter"
+                        ? "openai/gpt-4o-mini — or any id from openrouter.ai/models (add :free for free ones)"
+                        : "gpt-4o-mini"
+                  }
+                  defaultValue={s.aiModel}
+                  onBlur={(e) => e.target.value !== s.aiModel && persist({ aiModel: e.target.value })}
+                />
+              </Field>
+            )}
+          </div>
+
+          {/* Apollo */}
+          <ApiKeyField
+            label="Apollo.io API key — finds recruiters, managers & peers to reach out to"
+            saved={!!s.apolloApiKey}
+            onSave={(v) => persist({ apolloApiKey: v })}
+            onTest={testApollo}
+          />
         </div>
-        <div className="mt-3">
-          <Field label="Apollo.io API key (contact finding)">
-            <input
-              type="password" className={inputCls}
-              placeholder={s.apolloApiKey ? "••••••••  (saved)" : "paste key"}
-              onBlur={(e) => e.target.value && persist({ apolloApiKey: e.target.value })}
-            />
-          </Field>
-        </div>
-        <p className="mt-2 text-xs text-ink-faint">
-          Keys are stored in your own database and only used server-side. AI key powers
-          paste-text extraction, fit scores and outreach drafts; Apollo key powers
-          &ldquo;Find contacts&rdquo; and lead generation. For OpenRouter, grab a key at
-          openrouter.ai/keys and pick a model at openrouter.ai/models (append
-          <code className="mx-1">:free</code> for free ones).
+        <p className="mt-4 text-xs text-ink-faint">
+          Keys live in your own database, used only server-side. Hit <b>Test</b> after saving
+          to confirm each one works. For OpenRouter, get a key at openrouter.ai/keys and a
+          model id at openrouter.ai/models.
         </p>
       </Section>
 
       <Section title="Job discovery (Discover page)">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Adzuna App ID">
-            <input type="password" className={inputCls}
-              placeholder={s.adzunaAppId ? "••••••  (saved)" : "free at developer.adzuna.com"}
-              onBlur={(e) => e.target.value && persist({ adzunaAppId: e.target.value })} />
-          </Field>
-          <Field label="Adzuna App Key">
-            <input type="password" className={inputCls}
-              placeholder={s.adzunaAppKey ? "••••••  (saved)" : "paste key"}
-              onBlur={(e) => e.target.value && persist({ adzunaAppKey: e.target.value })} />
-          </Field>
-          <Field label="JSearch (RapidAPI) key" className="col-span-2">
-            <input type="password" className={inputCls}
-              placeholder={s.jsearchKey ? "••••••  (saved)" : "free tier at rapidapi.com/jsearch"}
-              onBlur={(e) => e.target.value && persist({ jsearchKey: e.target.value })} />
-          </Field>
+        <div className="space-y-5">
+          <ApiKeyField
+            label="Adzuna App ID"
+            saved={!!s.adzunaAppId}
+            onSave={(v) => persist({ adzunaAppId: v })}
+            placeholder="free at developer.adzuna.com"
+          />
+          <ApiKeyField
+            label="Adzuna App Key"
+            saved={!!s.adzunaAppKey}
+            onSave={(v) => persist({ adzunaAppKey: v })}
+            onTest={testAdzuna}
+            placeholder="paste key — Test checks the ID + Key together"
+          />
+          <ApiKeyField
+            label="JSearch (RapidAPI) key"
+            saved={!!s.jsearchKey}
+            onSave={(v) => persist({ jsearchKey: v })}
+            onTest={testJsearch}
+            placeholder="free tier at rapidapi.com/jsearch"
+          />
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3">
           <Field label="Profile blurb (powers fit scores & referral drafts)" className="col-span-2">
             <textarea className={cn(inputCls, "h-24 resize-y")}
               placeholder="e.g. 5 years full-stack (React/Node), shipped consumer products at two startups, strongest in frontend performance…"
