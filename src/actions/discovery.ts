@@ -95,22 +95,26 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
     return { error: "Add an AI key in Settings first — résumé parsing needs it." };
   }
 
-  // 1) extract text
-  const buf = Buffer.from(await file.arrayBuffer());
   let text = "";
   try {
+    const arrayBuf = await file.arrayBuffer();
+    const buf = Buffer.from(arrayBuf);
+    
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
       const { PDFParse } = await import("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(buf) });
       try { text = (await parser.getText()).text ?? ""; } finally { await parser.destroy(); }
     } else {
       text = buf.toString("utf8");
+      if (!text) {
+         return { error: `Text file conversion failed. Buffer size: ${buf.length}` };
+      }
     }
-  } catch {
-    return { error: "Couldn't read that file — try a text-based PDF or a .txt export." };
+  } catch (e: any) {
+    return { error: `Couldn't read that file: ${e?.message || String(e)}` };
   }
   text = text.replace(/\s+/g, " ").trim();
-  if (text.length < 80) return { error: "That résumé looks empty or is a scanned image (no selectable text)." };
+  if (text.length < 80) return { error: `That résumé looks empty. Length: ${text.length} chars. Name: ${file.name}, Size: ${file.size}, Type: ${file.type}` };
 
   // 2) store the file (so it can also attach to outreach) + keep the text
   const existingResumes = await db.select().from(resumes);
