@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Modal } from "@/components/ui/Modal";
 import { Field, inputCls, btnPrimary, btnGhost } from "@/components/ui/bits";
 import { AddApplicationModal } from "@/components/add/AddApplicationModal";
+import { NAV_ICONS } from "@/components/ui/icons";
 import { createTask } from "@/actions/misc";
 import type { Stage, Source, Tag } from "@/lib/data";
 
@@ -239,14 +240,14 @@ export function GlobalUI({
                 heading="Go to"
                 className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-faint"
               >
-                <PaletteItem onSelect={() => go("/")}>◉ Dashboard</PaletteItem>
-                <PaletteItem onSelect={() => go("/applications")}>▦ Applications</PaletteItem>
-                <PaletteItem onSelect={() => go("/discover")}>◈ Discover</PaletteItem>
-                <PaletteItem onSelect={() => go("/outreach")}>✉ Outreach</PaletteItem>
-                <PaletteItem onSelect={() => go("/tasks")}>☑ Tasks</PaletteItem>
-                <PaletteItem onSelect={() => go("/contacts")}>☺ Contacts</PaletteItem>
-                <PaletteItem onSelect={() => go("/analytics")}>◔ Analytics</PaletteItem>
-                <PaletteItem onSelect={() => go("/settings")}>⚙ Settings</PaletteItem>
+                <PaletteItem onSelect={() => go("/")}><span className="flex items-center gap-2.5"><NAV_ICONS.dashboard size={17} /> Dashboard</span></PaletteItem>
+                <PaletteItem onSelect={() => go("/applications")}><span className="flex items-center gap-2.5"><NAV_ICONS.applications size={17} /> Applications</span></PaletteItem>
+                <PaletteItem onSelect={() => go("/discover")}><span className="flex items-center gap-2.5"><NAV_ICONS.discover size={17} /> Discover</span></PaletteItem>
+                <PaletteItem onSelect={() => go("/outreach")}><span className="flex items-center gap-2.5"><NAV_ICONS.outreach size={17} /> Outreach</span></PaletteItem>
+                <PaletteItem onSelect={() => go("/tasks")}><span className="flex items-center gap-2.5"><NAV_ICONS.tasks size={17} /> Tasks</span></PaletteItem>
+                <PaletteItem onSelect={() => go("/contacts")}><span className="flex items-center gap-2.5"><NAV_ICONS.contacts size={17} /> Contacts</span></PaletteItem>
+                <PaletteItem onSelect={() => go("/analytics")}><span className="flex items-center gap-2.5"><NAV_ICONS.analytics size={17} /> Analytics</span></PaletteItem>
+                <PaletteItem onSelect={() => go("/settings")}><span className="flex items-center gap-2.5"><NAV_ICONS.settings size={17} /> Settings</span></PaletteItem>
               </Command.Group>
               {apps.length > 0 && (
                 <Command.Group
