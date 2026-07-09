@@ -96,9 +96,10 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
   }
 
   let text = "";
+  let buf: Buffer;
   try {
     const arrayBuf = await file.arrayBuffer();
-    const buf = Buffer.from(arrayBuf);
+    buf = Buffer.from(arrayBuf);
     
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
       const { PDFParse } = await import("pdf-parse");
@@ -110,8 +111,8 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
          return { error: `Text file conversion failed. Buffer size: ${buf.length}` };
       }
     }
-  } catch (e: any) {
-    return { error: `Couldn't read that file: ${e?.message || String(e)}` };
+  } catch (e: unknown) {
+    return { error: `Couldn't read that file: ${e instanceof Error ? e.message : String(e)}` };
   }
   text = text.replace(/\s+/g, " ").trim();
   if (text.length < 20) return { error: `That résumé looks empty. Length: ${text.length} chars. Name: ${file.name}, Size: ${file.size}, Type: ${file.type}` };
