@@ -109,7 +109,7 @@ export async function uploadResume(formData: FormData): Promise<{ ok?: true; err
   try {
     let text = "";
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      // @ts-ignore: Intentionally bypassing types for internal module
+      // @ts-expect-error: Intentionally bypassing types for internal module
       const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default || await import("pdf-parse/lib/pdf-parse.js");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const parsed = await (pdfParse as any)(buf);
