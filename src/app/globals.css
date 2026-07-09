@@ -90,6 +90,7 @@ body {
   top: -14rem;
   left: -10rem;
   background: radial-gradient(closest-side, var(--accent), transparent);
+  animation: float-1 20s ease-in-out infinite alternate;
 }
 .ambient::after {
   width: 40rem;
@@ -98,12 +99,24 @@ body {
   right: -8rem;
   background: radial-gradient(closest-side, #2dd4bf, transparent);
   opacity: 0.28;
+  animation: float-2 25s ease-in-out infinite alternate-reverse;
 }
 .dark .ambient::before {
   opacity: 0.3;
 }
 .dark .ambient::after {
   opacity: 0.16;
+}
+
+@keyframes float-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(5%, 10%) scale(1.05); }
+  100% { transform: translate(-5%, -5%) scale(0.95); }
+}
+@keyframes float-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-10%, -5%) scale(1.1); }
+  100% { transform: translate(5%, 10%) scale(0.9); }
 }
 
 /* liquid glass primitives */
