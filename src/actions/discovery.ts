@@ -103,6 +103,7 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
     
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
       if (typeof globalThis.DOMMatrix === "undefined") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (globalThis as any).DOMMatrix = class DOMMatrix {
           a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
         };
