@@ -102,15 +102,14 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
     buf = Buffer.from(arrayBuf);
     
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      if (typeof globalThis.DOMMatrix === "undefined") {
+      const PDFParser = (await import("pdf2json")).default;
+      text = await new Promise<string>((resolve, reject) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (globalThis as any).DOMMatrix = class DOMMatrix {
-          a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
-        };
-      }
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: new Uint8Array(buf) });
-      try { text = (await parser.getText()).text ?? ""; } finally { await parser.destroy(); }
+        const parser = new (PDFParser as any)(null, 1);
+        parser.on("pdfParser_dataError", (err: any) => reject(new Error(err.parserError)));
+        parser.on("pdfParser_dataReady", () => resolve(parser.getRawTextContent()));
+        parser.parseBuffer(buf);
+      });
     } else {
       text = buf.toString("utf8");
       if (!text) {
