@@ -224,9 +224,11 @@ export default function NotificationPanel({
           <footer className="shrink-0 border-t border-white/10 p-4">
             <button
               onClick={handleClearAll}
-              className="text-ink hover:text-ink-dim bg-white/5 hover:bg-white/10 w-full rounded-xl py-3 text-sm font-medium transition-colors"
+              className="group relative w-full overflow-hidden rounded-xl py-3 text-sm font-medium text-ink transition-colors hover:text-white shadow-[inset_0_1px_0_var(--glass-highlight)]"
             >
-              Clear all notifications
+              <div className="absolute inset-0 bg-white/5 transition-opacity group-hover:opacity-0" />
+              <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[linear-gradient(90deg,var(--accent),#2dd4bf,var(--accent))] animate-bg-pan" />
+              <span className="relative z-10 drop-shadow-md">Clear all notifications</span>
             </button>
           </footer>
         )}

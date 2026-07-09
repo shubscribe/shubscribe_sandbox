@@ -427,7 +427,8 @@ Respond ONLY with JSON:
 {"targetTitles":["..."],"seniority":"intern|junior|mid|senior|staff|lead|principal|director|exec","coreSkills":["..."],"domains":["..."],"locations":["..."],"remotePref":"remote|hybrid|onsite|any","minSalary":<number|null>,"yearsExperience":<number|null>}`
     );
     return parseStoredResumeProfile(JSON.stringify(p));
-  } catch {
+  } catch (e) {
+    console.error("AI parse error:", e);
     return null;
   }
 }

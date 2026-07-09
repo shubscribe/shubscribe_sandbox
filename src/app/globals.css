@@ -247,3 +247,12 @@ a:focus-visible {
 .slide-up {
   animation: slide-up 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+@keyframes bg-pan {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.animate-bg-pan {
+  animation: bg-pan 3s linear infinite;
+  background-size: 200% auto;
+}
