@@ -44,6 +44,8 @@ export type AppSettings = {
   // v5: track applications from the inbox
   emailTrackApplications: boolean; // scan inbox for "you applied" emails
   lastInboxScanAt: string; // ISO; empty = first run (90-day backfill)
+  // v5: resume-powered discovery
+  resumeProfile: string; // JSON: { targetTitles, seniority, coreSkills, domains, locations, remotePref, minSalary, yearsExperience }
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -83,6 +85,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dismissTastes: "",
   emailTrackApplications: true,
   lastInboxScanAt: "",
+  resumeProfile: "",
 };
 
 export async function getSettings(): Promise<AppSettings> {

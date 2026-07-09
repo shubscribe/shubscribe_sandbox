@@ -123,6 +123,12 @@ features and data are untouched).
 
 ### Job discovery
 
+- **Find jobs from your résumé** (Discover page) — upload a PDF and the AI parses
+  your skills, seniority and 2–3 target roles, searches every source, applies a
+  seniority filter, and ranks results for genuine fit (semantic, not just keyword
+  overlap). It also saves a recurring "From your résumé" search and fills your
+  profile so scoring/outreach improve everywhere. High-fit matches follow your
+  autopilot rules.
 - **Saved searches** run against Adzuna + JSearch (bring your own free keys),
   Remotive, RemoteOK, and the latest Hacker News "Who is hiring" thread.
 - **Company watchlist** polls public Greenhouse/Lever career boards (no keys).

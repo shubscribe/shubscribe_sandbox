@@ -183,9 +183,13 @@ async function scoreFit(jobs: Job[]): Promise<Map<string, { score: number; reaso
   if (!(await hasAiKey()) || jobs.length === 0) return out;
   const s = await getSettings();
   const tastes = s.dismissTastes.split("\n").filter(Boolean).slice(-15);
+  const prof = parseStoredResumeProfile(s.resumeProfile);
   const profile = [
     s.targetRole && `Target role: ${s.targetRole}`,
+    prof?.seniority && `Seniority: ${prof.seniority}`,
+    prof?.coreSkills?.length && `Core skills: ${prof.coreSkills.join(", ")}`,
     s.profileBlurb && `About the candidate: ${s.profileBlurb}`,
+    s.resumeText && `Résumé excerpt (score for genuine fit including transferable skills, not just keyword overlap):\n${s.resumeText.slice(0, 1800)}`,
     tastes.length &&
       `The candidate dismissed these recently (dismissal reason in parentheses) — score similar jobs lower:\n${tastes.join("\n")}`,
   ].filter(Boolean).join("\n") || "Target role: software engineer";
@@ -368,6 +372,179 @@ export async function runAutopilot(): Promise<AutopilotReport> {
     if ((j.fitScore ?? 100) < 50) {
       await markDiscovered(j.id, "dismissed");
       report.expired++;
+    }
+  }
+  return report;
+}
+
+/* ---------------- résumé-powered discovery (v5) ---------------- */
+
+export type ResumeProfile = {
+  targetTitles: string[];
+  seniority: string; // intern | junior | mid | senior | staff | lead | principal | director | exec
+  coreSkills: string[];
+  domains: string[];
+  locations: string[];
+  remotePref: "remote" | "hybrid" | "onsite" | "any";
+  minSalary: number | null;
+  yearsExperience: number | null;
+};
+
+export function parseStoredResumeProfile(json: string): ResumeProfile | null {
+  if (!json) return null;
+  try {
+    const p = JSON.parse(json) as Partial<ResumeProfile>;
+    return {
+      targetTitles: Array.isArray(p.targetTitles) ? p.targetTitles.slice(0, 4) : [],
+      seniority: typeof p.seniority === "string" ? p.seniority : "",
+      coreSkills: Array.isArray(p.coreSkills) ? p.coreSkills.slice(0, 20) : [],
+      domains: Array.isArray(p.domains) ? p.domains.slice(0, 8) : [],
+      locations: Array.isArray(p.locations) ? p.locations.slice(0, 5) : [],
+      remotePref: (["remote", "hybrid", "onsite", "any"].includes(p.remotePref as string) ? p.remotePref : "any") as ResumeProfile["remotePref"],
+      minSalary: typeof p.minSalary === "number" ? p.minSalary : null,
+      yearsExperience: typeof p.yearsExperience === "number" ? p.yearsExperience : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** AI-parse résumé text into a structured, searchable profile. */
+export async function parseResumeProfile(text: string): Promise<ResumeProfile | null> {
+  if (!(await hasAiKey()) || !text || text.length < 60) return null;
+  try {
+    const p = await llmJson<ResumeProfile>(
+      `Extract a structured, job-search profile from this résumé. Infer 2-3 realistic TARGET job titles
+the candidate should search for (their current level and adjacent roles — e.g. a senior React dev →
+"Senior Frontend Engineer", "Full Stack Engineer", "Product Engineer"). Pull the strongest, most
+searchable skills (technologies/tools), the domains/industries, any locations, remote preference,
+a realistic minimum salary for their level (USD, or null), seniority, and total years of experience.
+
+Résumé:
+${text.slice(0, 6000)}
+
+Respond ONLY with JSON:
+{"targetTitles":["..."],"seniority":"intern|junior|mid|senior|staff|lead|principal|director|exec","coreSkills":["..."],"domains":["..."],"locations":["..."],"remotePref":"remote|hybrid|onsite|any","minSalary":<number|null>,"yearsExperience":<number|null>}`
+    );
+    return parseStoredResumeProfile(JSON.stringify(p));
+  } catch {
+    return null;
+  }
+}
+
+const SENIORITY_RANK: Record<string, number> = {
+  intern: 0, junior: 1, mid: 2, senior: 3, staff: 4, lead: 4, principal: 5, director: 6, exec: 7,
+};
+function titleSeniority(title: string): number | null {
+  const t = title.toLowerCase();
+  if (/\b(intern|internship)\b/.test(t)) return 0;
+  if (/\b(junior|jr\.?|entry|associate|new grad|graduate)\b/.test(t)) return 1;
+  if (/\b(principal|distinguished)\b/.test(t)) return 5;
+  if (/\b(director|head of)\b/.test(t)) return 6;
+  if (/\b(vp|vice president|chief|cto|ceo|svp)\b/.test(t)) return 7;
+  if (/\b(staff|lead)\b/.test(t)) return 4;
+  if (/\b(senior|sr\.?)\b/.test(t)) return 3;
+  return null; // unknown → don't filter out
+}
+/** True if a job's level is clearly off from the résumé's level (drop it). */
+function seniorityMismatch(profileSeniority: string, title: string): boolean {
+  const want = SENIORITY_RANK[profileSeniority];
+  if (want == null) return false;
+  const got = titleSeniority(title);
+  if (got == null) return false;
+  return Math.abs(got - want) >= 2; // e.g. senior(3) vs intern(0)/director(6)
+}
+
+/** Build ad-hoc searches from the résumé profile (one per target title). */
+function resumeSearches(prof: ResumeProfile): Search[] {
+  const topSkills = prof.coreSkills.slice(0, 2).join(" ");
+  const loc = prof.locations[0] ?? null;
+  const remoteOnly = prof.remotePref === "remote";
+  return prof.targetTitles.slice(0, 3).map((title, i) => ({
+    id: `resume-${i}`,
+    name: `From your résumé — ${title}`,
+    keywords: `${title}${topSkills ? ` ${topSkills}` : ""}`.trim(),
+    location: remoteOnly ? null : loc,
+    remoteOnly,
+    salaryMin: prof.minSalary,
+    enabled: true,
+    createdAt: new Date(),
+  }));
+}
+
+/** Run every configured source for one ad-hoc search (best-effort, errors ignored). */
+async function collectAllSources(s: Search, settings: Awaited<ReturnType<typeof getSettings>>): Promise<Job[]> {
+  const out: Job[] = [];
+  const safe = async (fn: () => Promise<Job[]>) => { try { out.push(...await fn()); } catch { /* ignore per-source */ } };
+  if (settings.adzunaAppId && settings.adzunaAppKey) await safe(() => adzuna(s, settings.adzunaAppId, settings.adzunaAppKey));
+  if (settings.jsearchKey) await safe(() => jsearch(s, settings.jsearchKey));
+  await safe(() => remotive(s));
+  await safe(() => remoteok(s));
+  await safe(() => hackerNews(s));
+  return out;
+}
+
+export type ResumeDiscoveryReport = { queries: number; found: number; inserted: number; filtered: number; error?: string };
+
+/** Fetch + score jobs against the stored résumé profile, land them in the inbox. */
+export async function runResumeDiscovery(searchId?: string): Promise<ResumeDiscoveryReport> {
+  const s = await getSettings();
+  const report: ResumeDiscoveryReport = { queries: 0, found: 0, inserted: 0, filtered: 0 };
+  const prof = parseStoredResumeProfile(s.resumeProfile);
+  if (!prof || prof.targetTitles.length === 0) return { ...report, error: "no parsed résumé profile" };
+
+  const queries = resumeSearches(prof);
+  report.queries = queries.length;
+
+  const all: Job[] = [];
+  for (const q of queries) all.push(...await collectAllSources(q, s));
+
+  // dedupe within batch + against existing discovered + applications
+  const jobKey = (company: string, title: string) =>
+    `${company.toLowerCase().trim()}|${title.toLowerCase().replace(/\s+/g, " ").trim()}`;
+  const seen = new Set<string>();
+  const seenJobs = new Set<string>();
+  let unique = all.filter((j) => {
+    const k = `${j.source}:${j.externalId}`;
+    if (seen.has(k) || seenJobs.has(jobKey(j.company, j.title))) return false;
+    seen.add(k); seenJobs.add(jobKey(j.company, j.title));
+    return true;
+  });
+
+  // seniority hard filter (the user's chosen constraint)
+  const before = unique.length;
+  unique = unique.filter((j) => !seniorityMismatch(prof.seniority, j.title));
+  report.filtered = before - unique.length;
+
+  const discoveredRows = await db
+    .select({ source: discovered.source, externalId: discovered.externalId, company: discovered.company, title: discovered.title })
+    .from(discovered);
+  const existingIds = new Set(discoveredRows.map((d) => `${d.source}:${d.externalId}`));
+  const existingJobs = new Set(discoveredRows.map((d) => jobKey(d.company, d.title)));
+  const apps = await db.select({ company: applications.company, title: applications.title }).from(applications);
+  const appKeys = new Set(apps.map((a) => jobKey(a.company, a.title)));
+
+  const fresh = unique.filter(
+    (j) => !existingIds.has(`${j.source}:${j.externalId}`) && !existingJobs.has(jobKey(j.company, j.title)) && !appKeys.has(jobKey(j.company, j.title))
+  );
+  report.found = fresh.length;
+
+  const fits = await scoreFit(fresh);
+  for (const j of fresh) {
+    const fit = fits.get(`${j.source}:${j.externalId}`);
+    try {
+      await db.insert(discovered).values({
+        source: j.source, externalId: j.externalId, searchId: searchId ?? null,
+        company: j.company, title: j.title, url: j.url ?? null,
+        location: j.location ?? null, remote: j.remote ?? null,
+        salaryMin: j.salaryMin ?? null, salaryMax: j.salaryMax ?? null,
+        currency: j.currency ?? null, description: j.description ?? null,
+        postedAt: j.postedAt ? new Date(j.postedAt) : null,
+        fitScore: fit?.score ?? null, fitReason: fit?.reason ?? null,
+      });
+      report.inserted++;
+    } catch {
+      // unique-index race — fine
     }
   }
   return report;

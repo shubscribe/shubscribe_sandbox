@@ -1,11 +1,11 @@
 "use server";
 
-import { db, searches, watchlist, suggestions, applications, stages, tasks, contacts, applicationContacts, sources, discovered as discoveredTable } from "@/db";
+import { db, searches, watchlist, suggestions, applications, stages, tasks, contacts, applicationContacts, sources, resumes, discovered as discoveredTable } from "@/db";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "./applications";
 import { findApolloContacts } from "./misc";
-import { runScan, runAutopilot, markDiscovered, type ScanReport, type AutopilotReport } from "@/lib/discovery";
+import { runScan, runAutopilot, markDiscovered, parseResumeProfile, runResumeDiscovery, type ScanReport, type AutopilotReport, type ResumeProfile, type ResumeDiscoveryReport } from "@/lib/discovery";
 import { scanGmail, scanInboxApplications, createGmailDraft, disconnectGmail, type GmailScanReport, type InboxReport } from "@/lib/gmail";
 import { llmJson } from "@/lib/llm";
 import { getSettings, setSettings } from "@/lib/settings";
@@ -73,6 +73,99 @@ export async function scanNow(): Promise<{ discovery: ScanReport; gmail: GmailSc
   }
   revalidate();
   return { discovery, gmail, autopilot, inbox };
+}
+
+/* ---------- résumé-powered discovery ---------- */
+
+export type ResumeDiscoverResult = {
+  ok?: true;
+  error?: string;
+  profile?: ResumeProfile;
+  report?: ResumeDiscoveryReport;
+  autopilot?: AutopilotReport;
+};
+
+export async function uploadResumeAndDiscover(formData: FormData): Promise<ResumeDiscoverResult> {
+  const file = formData.get("file") as File | null;
+  if (!file) return { error: "No file" };
+  if (file.size > 3.5 * 1024 * 1024) return { error: "Keep the résumé under 3.5 MB" };
+
+  const settings = await getSettings();
+  if (!settings.aiProvider || !settings.aiApiKey) {
+    return { error: "Add an AI key in Settings first — résumé parsing needs it." };
+  }
+
+  // 1) extract text
+  const buf = Buffer.from(await file.arrayBuffer());
+  let text = "";
+  try {
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({ data: new Uint8Array(buf) });
+      try { text = (await parser.getText()).text ?? ""; } finally { await parser.destroy(); }
+    } else {
+      text = buf.toString("utf8");
+    }
+  } catch {
+    return { error: "Couldn't read that file — try a text-based PDF or a .txt export." };
+  }
+  text = text.replace(/\s+/g, " ").trim();
+  if (text.length < 80) return { error: "That résumé looks empty or is a scanned image (no selectable text)." };
+
+  // 2) store the file (so it can also attach to outreach) + keep the text
+  const existingResumes = await db.select().from(resumes);
+  await db.insert(resumes).values({
+    name: file.name.replace(/\.(pdf|txt|md)$/i, "") || "Résumé",
+    filename: file.name, mime: file.type || "application/pdf",
+    data: buf.toString("base64"), isDefault: existingResumes.length === 0,
+  });
+  await setSettings({ resumeText: text.slice(0, 6000) });
+
+  // 3) AI parse → structured profile
+  const profile = await parseResumeProfile(text);
+  if (!profile || profile.targetTitles.length === 0) {
+    return { error: "AI couldn't parse the résumé (it may be rate-limited). Try again in a minute." };
+  }
+  await setSettings({ resumeProfile: JSON.stringify(profile) });
+
+  // 4) update profile fields (fill blanks; always set target role from the résumé)
+  const blurb = !settings.profileBlurb
+    ? [
+        profile.yearsExperience ? `${profile.yearsExperience}+ years'` : "Experienced",
+        profile.seniority, profile.targetTitles[0],
+        profile.coreSkills.length ? `— strongest in ${profile.coreSkills.slice(0, 5).join(", ")}` : "",
+        profile.domains.length ? `. Background in ${profile.domains.slice(0, 3).join(", ")}.` : ".",
+      ].filter(Boolean).join(" ")
+    : undefined;
+  await setSettings({ targetRole: profile.targetTitles[0], ...(blurb ? { profileBlurb: blurb } : {}) });
+
+  // 5) create/update the recurring "From your résumé" saved search
+  const topSkills = profile.coreSkills.slice(0, 2).join(" ");
+  const searchName = "From your résumé";
+  const existingSearch = (await db.select().from(searches)).find((x) => x.name === searchName);
+  const searchVals = {
+    name: searchName,
+    keywords: `${profile.targetTitles[0]}${topSkills ? ` ${topSkills}` : ""}`.trim(),
+    location: profile.remotePref === "remote" ? null : (profile.locations[0] ?? null),
+    remoteOnly: profile.remotePref === "remote",
+    salaryMin: profile.minSalary,
+    enabled: true,
+  };
+  let searchId: string;
+  if (existingSearch) {
+    await db.update(searches).set(searchVals).where(eq(searches.id, existingSearch.id));
+    searchId = existingSearch.id;
+  } else {
+    const [row] = await db.insert(searches).values(searchVals).returning();
+    searchId = row.id;
+  }
+
+  // 6) run the résumé discovery now, then full autopilot on high-fit results
+  const report = await runResumeDiscovery(searchId);
+  const autopilot = await runAutopilot();
+
+  revalidate();
+  return { ok: true, profile, report, autopilot };
 }
 
 /* ---------- inbox actions ---------- */
