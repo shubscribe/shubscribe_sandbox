@@ -9,16 +9,9 @@ import { eq } from "drizzle-orm";
 import { DueTaskList, StaleList } from "@/components/dashboard/ActionLists";
 import { SuggestionList } from "@/components/dashboard/SuggestionList";
 import { SetupChecklist, QueuePreview, MatchesPreview } from "@/components/dashboard/Briefing";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 export const dynamic = "force-dynamic";
-
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 5) return "Burning the midnight oil";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
 
 export default async function DashboardPage() {
   const [
@@ -96,19 +89,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            {greeting()}{settings.name ? `, ${settings.name.split(" ")[0]}` : ""} 👋
-          </h1>
-          {settings.targetRole && (
-            <p className="text-sm text-ink-dim">Hunting: {settings.targetRole}</p>
-          )}
-        </div>
-        <p className="text-xs text-ink-faint">
-          {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
-        </p>
-      </div>
+      <DashboardHeader
+        firstName={settings.name ? settings.name.split(" ")[0] : ""}
+        targetRole={settings.targetRole}
+      />
 
       {!settings.setupDismissed && <SetupChecklist items={setupItems} />}
 
