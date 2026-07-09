@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Chip, inputCls, btnPrimary } from "@/components/ui/bits";
 import {
-  scanNow, approveDiscovered, dismissDiscovered,
+  scanNow, approveDiscovered, dismissDiscovered, uploadResumeAndDiscover,
   createSearch, toggleSearch, deleteSearch, addWatch, deleteWatch,
 } from "@/actions/discovery";
 import { cn, salaryLabel, timeAgo } from "@/lib/utils";
@@ -50,6 +50,39 @@ export function DiscoverView({
   const [watchDraft, setWatchDraft] = useState({ company: "", ats: "greenhouse" as "greenhouse" | "lever", slug: "", keywords: "" });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [reasonFor, setReasonFor] = useState<string | null>(null);
+  const resumeRef = useRef<HTMLInputElement>(null);
+  const [resumeBusy, setResumeBusy] = useState(false);
+  const [resumeMsg, setResumeMsg] = useState("");
+  const [detected, setDetected] = useState<{ titles: string[]; skills: string[]; seniority: string } | null>(null);
+
+  async function findFromResume(file: File) {
+    setResumeBusy(true);
+    setDetected(null);
+    setResumeMsg("Reading your résumé…");
+    try {
+      const fd = new FormData();
+      fd.set("file", file);
+      setResumeMsg("Parsing skills & experience, then searching…");
+      const res = await uploadResumeAndDiscover(fd);
+      if (res.error) { toast.error(res.error); setResumeMsg(""); return; }
+      if (res.profile) {
+        setDetected({ titles: res.profile.targetTitles, skills: res.profile.coreSkills.slice(0, 8), seniority: res.profile.seniority });
+      }
+      const found = res.report?.inserted ?? 0;
+      const added = res.autopilot?.autoAdded ?? 0;
+      toast.success(
+        `Found ${found} match${found === 1 ? "" : "es"} from your résumé` +
+        (added ? `, ${added} auto-added to your pipeline` : "")
+      );
+      setResumeMsg(`Done — ${found} new match${found === 1 ? "" : "es"} in your inbox below.`);
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong parsing the résumé.");
+      setResumeMsg("");
+    } finally {
+      setResumeBusy(false);
+    }
+  }
 
   async function scan() {
     setScanning(true);
@@ -105,6 +138,60 @@ export function DiscoverView({
         <button className={cn(btnPrimary, "ml-auto")} onClick={scan} disabled={scanning}>
           {scanning ? "Scanning…" : "⟳ Scan now"}
         </button>
+      </div>
+
+      {/* résumé-powered discovery */}
+      <div className="glass mb-4 overflow-hidden p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-lg">📄</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">Find jobs from your résumé</div>
+            <div className="text-xs text-ink-faint">
+              Upload it once — AI reads your skills, seniority and target roles, then searches every
+              source and ranks matches for genuine fit. Saved as a recurring search.
+            </div>
+          </div>
+          <button
+            className={cn(btnPrimary, "shrink-0")}
+            onClick={() => resumeRef.current?.click()}
+            disabled={resumeBusy}
+          >
+            {resumeBusy ? "Working…" : "⬆ Upload résumé"}
+          </button>
+          <input
+            ref={resumeRef} type="file" accept=".pdf,.txt,.md" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) findFromResume(f); }}
+          />
+        </div>
+
+        {(resumeBusy || resumeMsg) && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-ink-dim">
+            {resumeBusy && (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+            )}
+            {resumeMsg}
+          </div>
+        )}
+
+        {detected && (
+          <div className="mt-3 space-y-2 border-t border-line pt-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-medium text-ink-faint">Searching for:</span>
+              {detected.titles.map((t) => <Chip key={t} color="var(--accent)">{t}</Chip>)}
+              {detected.seniority && <Chip>{detected.seniority}</Chip>}
+            </div>
+            {detected.skills.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-medium text-ink-faint">Key skills:</span>
+                {detected.skills.map((sk) => <Chip key={sk}>{sk}</Chip>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!keys.ai && (
+          <p className="mt-2 text-xs text-warn">Add an AI key in Settings first — résumé parsing needs it.</p>
+        )}
       </div>
 
       {(!keys.adzuna || !keys.jsearch || !keys.ai) && (
