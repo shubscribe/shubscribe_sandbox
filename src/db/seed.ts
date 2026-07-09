@@ -206,6 +206,20 @@ async function main() {
   ]);
   console.log("• seeded 3 demo discovered jobs");
 
+  /* demo inbox suggestion: a "you applied" email for a company not yet tracked */
+  const inboxAppliedStage = stageByName.get("Applied");
+  await db.insert(schema.suggestions).values({
+    gmailThreadId: "demo-thread-1",
+    kind: "applied",
+    subject: "We received your application — Datadog",
+    fromAddr: "Datadog Careers <no-reply@datadog.com>",
+    snippet: "Thanks for applying to the Senior Frontend Engineer role. Our team will review your application…",
+    proposedCompany: "Datadog",
+    proposedTitle: "Senior Frontend Engineer",
+    proposedStageId: inboxAppliedStage?.id ?? null,
+  });
+  console.log("• seeded 1 demo inbox 'you applied' suggestion");
+
   /* demo outreach campaign (cascades away with the demo application) */
   const [linearApp] = await db
     .select()

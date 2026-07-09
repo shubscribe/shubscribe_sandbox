@@ -41,6 +41,9 @@ export type AppSettings = {
   lastDigestDay: string; // YYYY-MM-DD of last digest check
   gmailAddress: string; // captured at connect time; digest recipient
   dismissTastes: string; // newline log of "company — title (reason)" dismissals, feeds fit scoring
+  // v5: track applications from the inbox
+  emailTrackApplications: boolean; // scan inbox for "you applied" emails
+  lastInboxScanAt: string; // ISO; empty = first run (90-day backfill)
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -78,6 +81,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   lastDigestDay: "",
   gmailAddress: "",
   dismissTastes: "",
+  emailTrackApplications: true,
+  lastInboxScanAt: "",
 };
 
 export async function getSettings(): Promise<AppSettings> {
@@ -88,7 +93,7 @@ export async function getSettings(): Promise<AppSettings> {
     ...Object.fromEntries(
       Object.entries(map).map(([k, v]) => {
         if (["weeklyGoal", "staleDays", "autoAddThreshold", "dailySendCap", "sendWindowStart", "sendWindowEnd"].includes(k)) return [k, Number(v)];
-        if (["onboarded", "gmailConnected", "outreachPaused", "setupDismissed", "dailyDigest"].includes(k)) return [k, v === "true"];
+        if (["onboarded", "gmailConnected", "outreachPaused", "setupDismissed", "dailyDigest", "emailTrackApplications"].includes(k)) return [k, v === "true"];
         return [k, v];
       })
     ),

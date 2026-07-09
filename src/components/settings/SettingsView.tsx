@@ -663,6 +663,20 @@ export function SettingsView({
             />
           </Field>
         </div>
+        <label className="mt-3 flex items-start gap-2 text-sm text-ink-dim">
+          <input
+            type="checkbox"
+            checked={s.emailTrackApplications}
+            onChange={(e) => persist({ emailTrackApplications: e.target.checked })}
+            className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+          />
+          <span>
+            Track applications from my inbox — scan for &ldquo;you applied&rdquo; emails and
+            auto-add new applications (confident ones directly, unclear ones as a one-click
+            suggestion). Interview / rejection / offer emails propose stage changes. The first
+            scan backfills the last 90 days.
+          </span>
+        </label>
       </Section>
 
       <Section title="Data export & import">

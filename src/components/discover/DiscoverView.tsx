@@ -56,10 +56,13 @@ export function DiscoverView({
     try {
       const report = await scanNow();
       const errs = report.discovery.sources.filter((s) => s.status === "error").length;
+      const inbox = report.inbox;
       toast.success(
         `Scan done — ${report.discovery.inserted} new job(s)` +
         (report.autopilot.autoAdded ? `, ${report.autopilot.autoAdded} auto-added (${report.autopilot.campaignsCreated} campaign(s))` : "") +
         (report.gmail.suggested ? `, ${report.gmail.suggested} email suggestion(s)` : "") +
+        (inbox && inbox.added ? `, ${inbox.added} application(s) from email` : "") +
+        (inbox && inbox.suggested ? `, ${inbox.suggested} to confirm` : "") +
         (errs ? ` (${errs} source(s) failed)` : "")
       );
       router.refresh();
