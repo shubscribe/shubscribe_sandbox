@@ -109,14 +109,14 @@ export async function uploadResume(formData: FormData): Promise<{ ok?: true; err
   try {
     let text = "";
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: new Uint8Array(buf) });
-      try {
-        const parsed = await parser.getText();
-        text = parsed.text ?? "";
-      } finally {
-        await parser.destroy();
-      }
+      const PDFParser = (await import("pdf2json")).default;
+      text = await new Promise<string>((resolve, reject) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parser = new (PDFParser as any)(null, 1);
+        parser.on("pdfParser_dataError", (err: any) => reject(new Error(err.parserError)));
+        parser.on("pdfParser_dataReady", () => resolve(parser.getRawTextContent()));
+        parser.parseBuffer(buf);
+      });
     } else if (/text|markdown/.test(file.type) || /\.(txt|md)$/i.test(file.name)) {
       text = buf.toString("utf8");
     }
