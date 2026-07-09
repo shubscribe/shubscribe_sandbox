@@ -107,7 +107,7 @@ export default function NotificationPanel({
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop overlay */}
       <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm cursor-pointer"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -119,31 +119,33 @@ export default function NotificationPanel({
         aria-label="Notifications"
       >
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-ink text-lg font-semibold">Notifications</h2>
-            {unreadCount > 0 && (
-              <span className="bg-accent-soft text-accent rounded-full px-2 py-0.5 text-xs font-medium">
-                {unreadCount}
-              </span>
-            )}
-          </div>
+        <header className="flex items-center justify-between shrink-0 border-b border-white/10 px-5 py-4">
           <div className="flex items-center gap-2">
             <button
-              onClick={handleMarkAllRead}
-              disabled={unreadCount === 0}
-              className="text-accent hover:text-accent/80 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={onClose}
+              className="text-ink-faint hover:text-ink -ml-2 rounded-lg p-1.5 transition-colors"
+              aria-label="Back"
             >
-              Mark all read
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 18-6-6 6-6"/>
+              </svg>
             </button>
-            <button
-              onClick={handleClearAll}
-              disabled={notifications.length === 0}
-              className="text-ink-faint hover:text-ink-dim rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Clear all
-            </button>
+            <div className="flex items-center gap-2">
+              <h2 className="text-ink text-lg font-semibold">Notifications</h2>
+              {unreadCount > 0 && (
+                <span className="bg-accent-soft text-accent rounded-full px-2 py-0.5 text-xs font-medium">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
           </div>
+          <button
+            onClick={handleMarkAllRead}
+            disabled={unreadCount === 0}
+            className="text-accent hover:text-accent/80 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Mark all read
+          </button>
         </header>
 
         {/* Notification list */}
@@ -216,6 +218,18 @@ export default function NotificationPanel({
             </ul>
           )}
         </div>
+
+        {/* Footer */}
+        {notifications.length > 0 && (
+          <footer className="shrink-0 border-t border-white/10 p-4">
+            <button
+              onClick={handleClearAll}
+              className="text-ink hover:text-ink-dim bg-white/5 hover:bg-white/10 w-full rounded-xl py-3 text-sm font-medium transition-colors"
+            >
+              Clear all notifications
+            </button>
+          </footer>
+        )}
       </aside>
     </div>
   );
