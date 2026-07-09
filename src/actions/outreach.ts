@@ -110,6 +110,7 @@ export async function uploadResume(formData: FormData): Promise<{ ok?: true; err
     let text = "";
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
       const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default || await import("pdf-parse/lib/pdf-parse.js");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const parsed = await (pdfParse as any)(buf);
       text = parsed.text ?? "";
     } else if (/text|markdown/.test(file.type) || /\.(txt|md)$/i.test(file.name)) {

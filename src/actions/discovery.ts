@@ -103,6 +103,7 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
     
     if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
       const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default || await import("pdf-parse/lib/pdf-parse.js");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const parsed = await (pdfParse as any)(buf);
       text = parsed.text ?? "";
     } else {
