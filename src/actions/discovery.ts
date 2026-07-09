@@ -106,7 +106,7 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
       text = await new Promise<string>((resolve, reject) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const parser = new (PDFParser as any)(null, 1);
-        parser.on("pdfParser_dataError", (err: any) => reject(new Error(err.parserError)));
+        parser.on("pdfParser_dataError", (err: { parserError: string }) => reject(new Error(err.parserError)));
         parser.on("pdfParser_dataReady", () => resolve(parser.getRawTextContent()));
         parser.parseBuffer(buf);
       });
