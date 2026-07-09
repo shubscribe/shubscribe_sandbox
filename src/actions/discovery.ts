@@ -114,7 +114,7 @@ export async function uploadResumeAndDiscover(formData: FormData): Promise<Resum
     return { error: `Couldn't read that file: ${e?.message || String(e)}` };
   }
   text = text.replace(/\s+/g, " ").trim();
-  if (text.length < 80) return { error: `That résumé looks empty. Length: ${text.length} chars. Name: ${file.name}, Size: ${file.size}, Type: ${file.type}` };
+  if (text.length < 20) return { error: `That résumé looks empty. Length: ${text.length} chars. Name: ${file.name}, Size: ${file.size}, Type: ${file.type}` };
 
   // 2) store the file (so it can also attach to outreach) + keep the text
   const existingResumes = await db.select().from(resumes);
