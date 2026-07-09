@@ -138,19 +138,33 @@ body {
   border-radius: 9999px;
 }
 
-/* Apple-style floating liquid-glass tab bar (mobile) */
+/* Apple-style floating liquid-glass tab bar (mobile) — dual pill */
 .liquid-bar {
-  background: color-mix(in oklab, var(--raised) 82%, transparent);
-  backdrop-filter: blur(34px) saturate(2);
-  -webkit-backdrop-filter: blur(34px) saturate(2);
+  background: color-mix(in oklab, var(--raised) 92%, transparent);
+  backdrop-filter: blur(44px) saturate(2.2);
+  -webkit-backdrop-filter: blur(44px) saturate(2.2);
   border: 1px solid var(--glass-highlight);
-  border-radius: 26px;
-  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+  border-radius: 28px;
+  padding: 4px;
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    inset 0 0 0 0.5px color-mix(in oklab, var(--ink) 5%, transparent),
-    0 8px 32px rgba(0, 0, 0, 0.34),
-    0 2px 8px rgba(0, 0, 0, 0.22);
+    inset 0 0 0 0.5px color-mix(in oklab, var(--ink) 6%, transparent),
+    0 8px 32px rgba(0, 0, 0, 0.38),
+    0 2px 8px rgba(0, 0, 0, 0.24);
+}
+
+.liquid-pill {
+  background: color-mix(in oklab, var(--raised) 90%, transparent);
+  backdrop-filter: blur(44px) saturate(2.2);
+  -webkit-backdrop-filter: blur(44px) saturate(2.2);
+  border: 1px solid var(--glass-highlight);
+  border-radius: 24px;
+  padding: 4px;
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 0 0 0.5px color-mix(in oklab, var(--ink) 6%, transparent),
+    0 8px 32px rgba(0, 0, 0, 0.38),
+    0 2px 8px rgba(0, 0, 0, 0.24);
 }
 
 .num {
@@ -218,4 +232,18 @@ a:focus-visible {
 }
 .pop-in {
   animation: pop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.slide-up {
+  animation: slide-up 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }

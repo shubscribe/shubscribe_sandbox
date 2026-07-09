@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "npx drizzle-kit push && next build",
     "start": "next start",
     "lint": "eslint",
     "db:push": "drizzle-kit push",
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "test:db-setup": "TURSO_DATABASE_URL=file:test.db drizzle-kit push",
+    "test:run": "TURSO_DATABASE_URL=file:test.db node --import tsx --test tests/**/*.test.ts",
+    "test:db-cleanup": "node -e \"const fs = require('fs'); ['test.db', 'test.db-journal'].forEach(f => fs.existsSync(f) && fs.unlinkSync(f))\"",
+    "test": "npm run test:db-setup && (npm run test:run; status=$?; npm run test:db-cleanup; exit $status)"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

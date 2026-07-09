@@ -274,3 +274,12 @@ export const suggestions = sqliteTable("suggestions", {
   status: text("status").notNull().default("pending"), // pending | applied | dismissed
   createdAt: now(),
 });
+
+export const notifications = sqliteTable("notifications", {
+  id: id(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  linkUrl: text("link_url"),
+  read: integer("read", { mode: "boolean" }).notNull().default(false),
+  createdAt: now(),
+});

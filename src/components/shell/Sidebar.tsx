@@ -6,7 +6,8 @@ import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import { cn, monogram } from "@/lib/utils";
-import { NAV_ICONS, type NavIconName, IconSun, IconMoon, IconSignOut, IconHelp, IconSettings } from "@/components/ui/icons";
+import { NAV_ICONS, type NavIconName, IconSun, IconMoon, IconSignOut, IconHelp, IconSettings, IconBell } from "@/components/ui/icons";
+import NotificationPanel from "@/components/shell/NotificationPanel";
 
 const NAV: { href: string; label: string; icon: NavIconName; key: string }[] = [
   { href: "/", label: "Dashboard", icon: "dashboard", key: "1" },
@@ -169,12 +170,30 @@ export function Sidebar({
         </nav>
 
         <div className="mt-auto space-y-3">
-          <div className="flex items-center justify-end px-1">
+          <div className="flex items-center justify-end gap-1.5 px-1">
+            <NotificationBell />
             <ThemeToggle />
           </div>
           <AccountMenu name={name} email={email} image={image} />
         </div>
       </div>
     </aside>
+  );
+}
+
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="glass-pill relative flex h-9 w-9 items-center justify-center text-ink-dim transition hover:text-ink"
+        title="Notifications"
+        aria-label="Open notifications"
+      >
+        <IconBell size={17} />
+      </button>
+      <NotificationPanel open={open} onClose={() => setOpen(false)} />
+    </>
   );
 }

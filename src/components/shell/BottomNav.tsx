@@ -7,8 +7,9 @@ import { useTheme } from "next-themes";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  NAV_ICONS, type NavIconName, IconMore, IconSun, IconMoon, IconSignOut, IconHelp,
+  NAV_ICONS, type NavIconName, IconMore, IconSun, IconMoon, IconSignOut, IconHelp, IconBell,
 } from "@/components/ui/icons";
+import NotificationPanel from "@/components/shell/NotificationPanel";
 
 const TABS: { href: string; label: string; icon: NavIconName }[] = [
   { href: "/", label: "Home", icon: "dashboard" },
@@ -36,6 +37,7 @@ export function BottomNav({
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const moreActive = MORE.some((m) => pathname.startsWith(m.href));
 
   const badge = (n: number) =>
@@ -100,44 +102,66 @@ export function BottomNav({
         </div>
       )}
 
-      {/* Apple-style floating liquid-glass tab bar */}
-      <nav
-        className="liquid-bar fixed inset-x-3 bottom-3 z-40 flex items-stretch justify-around pb-[env(safe-area-inset-bottom)] md:hidden"
+      {/* Notification Panel */}
+      <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+
+      {/* iOS 18 Dynamic Island dual-pill floating tab bar */}
+      <div
+        className="slide-up fixed inset-x-3 bottom-3 z-40 flex items-end gap-2 pb-[env(safe-area-inset-bottom)] md:hidden"
         aria-label="Primary"
       >
-        {TABS.map((t) => {
-          const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
-          const Icon = NAV_ICONS[t.icon];
-          return (
-            <Link
-              key={t.href}
-              href={t.href}
-              onClick={() => setMoreOpen(false)}
-              className={cn(
-                "flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-[10px] font-medium transition",
-                active ? "text-accent" : "text-ink-faint active:scale-95"
-              )}
-            >
-              <span className="relative">
-                <Icon size={22} />
-                {t.href === "/discover" && badge(discoverCount)}
-                {t.href === "/outreach" && badge(outreachCount)}
-              </span>
-              {t.label}
-            </Link>
-          );
-        })}
-        <button
-          onClick={() => setMoreOpen((v) => !v)}
-          className={cn(
-            "flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-[10px] font-medium transition active:scale-95",
-            moreActive || moreOpen ? "text-accent" : "text-ink-faint"
-          )}
-        >
-          <IconMore size={22} />
-          More
-        </button>
-      </nav>
+        {/* Primary pill — navigation tabs */}
+        <nav className="liquid-pill flex flex-1 items-stretch justify-around">
+          {TABS.map((t) => {
+            const active = t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
+            const Icon = NAV_ICONS[t.icon];
+            return (
+              <Link
+                key={t.href}
+                href={t.href}
+                onClick={() => setMoreOpen(false)}
+                className={cn(
+                  "flex flex-1 flex-col items-center gap-0.5 rounded-[20px] py-2.5 text-[10px] font-medium transition-all",
+                  active
+                    ? "text-accent bg-accent-soft/40"
+                    : "text-ink-faint active:scale-95"
+                )}
+              >
+                <span className="relative">
+                  <Icon size={21} />
+                  {t.href === "/discover" && badge(discoverCount)}
+                  {t.href === "/outreach" && badge(outreachCount)}
+                </span>
+                {t.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Secondary pill — bell + more */}
+        <div className="liquid-pill flex items-stretch gap-0.5">
+          <button
+            onClick={() => setNotifOpen(true)}
+            className={cn(
+              "flex flex-col items-center gap-0.5 rounded-[20px] px-3.5 py-2.5 text-[10px] font-medium transition-all",
+              notifOpen ? "text-accent bg-accent-soft/40" : "text-ink-faint active:scale-95"
+            )}
+          >
+            <IconBell size={21} />
+            <span>Alerts</span>
+          </button>
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            className={cn(
+              "flex flex-col items-center gap-0.5 rounded-[20px] px-3.5 py-2.5 text-[10px] font-medium transition-all",
+              moreActive || moreOpen ? "text-accent bg-accent-soft/40" : "text-ink-faint active:scale-95"
+            )}
+          >
+            <IconMore size={21} />
+            <span>More</span>
+          </button>
+        </div>
+      </div>
     </>
   );
 }
