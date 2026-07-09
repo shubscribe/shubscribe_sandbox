@@ -1,12 +1,12 @@
 "use server";
 
-import { db, searches, watchlist, suggestions, applications, stages, tasks, contacts, applicationContacts, discovered as discoveredTable } from "@/db";
+import { db, searches, watchlist, suggestions, applications, stages, tasks, contacts, applicationContacts, sources, discovered as discoveredTable } from "@/db";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "./applications";
 import { findApolloContacts } from "./misc";
 import { runScan, runAutopilot, markDiscovered, type ScanReport, type AutopilotReport } from "@/lib/discovery";
-import { scanGmail, createGmailDraft, disconnectGmail, type GmailScanReport } from "@/lib/gmail";
+import { scanGmail, scanInboxApplications, createGmailDraft, disconnectGmail, type GmailScanReport, type InboxReport } from "@/lib/gmail";
 import { llmJson } from "@/lib/llm";
 import { getSettings, setSettings } from "@/lib/settings";
 
@@ -56,7 +56,7 @@ export async function deleteWatch(id: string) {
 
 /* ---------- scan ---------- */
 
-export async function scanNow(): Promise<{ discovery: ScanReport; gmail: GmailScanReport; autopilot: AutopilotReport }> {
+export async function scanNow(): Promise<{ discovery: ScanReport; gmail: GmailScanReport; autopilot: AutopilotReport; inbox?: InboxReport }> {
   const discovery = await runScan();
   const autopilot = await runAutopilot();
   let gmail: GmailScanReport;
@@ -65,8 +65,14 @@ export async function scanNow(): Promise<{ discovery: ScanReport; gmail: GmailSc
   } catch (e) {
     gmail = { scanned: 0, suggested: 0, error: e instanceof Error ? e.message : "failed" };
   }
+  let inbox: InboxReport | undefined;
+  try {
+    inbox = await scanInboxApplications();
+  } catch (e) {
+    inbox = { scanned: 0, added: 0, suggested: 0, loggedReplies: 0, error: e instanceof Error ? e.message : "failed" };
+  }
   revalidate();
-  return { discovery, gmail, autopilot };
+  return { discovery, gmail, autopilot, inbox };
 }
 
 /* ---------- inbox actions ---------- */
@@ -109,7 +115,41 @@ export async function dismissDiscovered(id: string, reason?: string) {
 
 export async function applySuggestion(id: string) {
   const [sg] = await db.select().from(suggestions).where(eq(suggestions.id, id));
-  if (!sg || !sg.applicationId) return;
+  if (!sg) return;
+
+  // "applied" suggestion with no linked app → create a new application from the email
+  if (!sg.applicationId && sg.kind === "applied" && sg.proposedCompany) {
+    // dedupe: if this company is already tracked, don't create a twin
+    const company = sg.proposedCompany.toLowerCase().trim();
+    const dupe = (await db.select().from(applications))
+      .find((a) => !a.archived && (a.company.toLowerCase().includes(company) || company.includes(a.company.toLowerCase())));
+    if (dupe) {
+      await logActivity(dupe.id, "note", `📧 Application email matched an existing entry — “${sg.subject ?? ""}”`);
+      await db.update(suggestions).set({ status: "applied" }).where(eq(suggestions.id, id));
+      revalidate();
+      return;
+    }
+    const allSources = await db.select().from(sources);
+    let emailSource = allSources.find((x) => x.name.toLowerCase() === "email")?.id ?? null;
+    if (!emailSource) {
+      const [row] = await db.insert(sources).values({ name: "Email", color: "#a78bfa" }).returning();
+      emailSource = row.id;
+    }
+    const [created] = await db.insert(applications).values({
+      company: sg.proposedCompany,
+      title: sg.proposedTitle || "Role from email",
+      sourceId: emailSource,
+      stageId: sg.proposedStageId ?? null,
+      appliedAt: sg.createdAt ?? new Date(),
+      emailThreadId: sg.gmailThreadId,
+    }).returning();
+    await logActivity(created.id, "created", `📧 Added from an application email — ${sg.proposedCompany}`);
+    await db.update(suggestions).set({ status: "applied" }).where(eq(suggestions.id, id));
+    revalidate();
+    return;
+  }
+
+  if (!sg.applicationId) return;
   const [app] = await db.select().from(applications).where(eq(applications.id, sg.applicationId));
   if (!app) return;
 
@@ -120,7 +160,8 @@ export async function applySuggestion(id: string) {
     await db.update(applications).set({ stageId: sg.proposedStageId, updatedAt: new Date() }).where(eq(applications.id, app.id));
     await logActivity(app.id, "stage_change", `${app.company}: ${from?.name ?? "—"} → ${to?.name ?? "—"} (from email)`, { from: app.stageId, to: sg.proposedStageId });
   }
-  await logActivity(sg.applicationId, "note", `📧 ${sg.kind === "interview" ? "Interview email" : sg.kind === "rejection" ? "Rejection email" : "Email reply"}: “${sg.subject ?? ""}”`);
+  const kindLabel = sg.kind === "interview" ? "Interview email" : sg.kind === "rejection" ? "Rejection email" : sg.kind === "offer" ? "Offer email" : "Email reply";
+  await logActivity(sg.applicationId, "note", `📧 ${kindLabel}: “${sg.subject ?? ""}”`);
   if (sg.proposedTask) {
     await db.insert(tasks).values({
       applicationId: sg.applicationId, title: sg.proposedTask,

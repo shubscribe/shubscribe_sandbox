@@ -75,6 +75,8 @@ export default async function DashboardPage() {
       ? (allStages.find((st) => st.id === sg.proposedStageId)?.name ?? null)
       : null,
     proposedTask: sg.proposedTask,
+    proposedCompany: sg.proposedCompany ?? null,
+    proposedTitle: sg.proposedTitle ?? null,
   }));
   const { stats } = data;
   const goalPct = Math.min(100, Math.round((stats.appliedThisWeek / Math.max(1, stats.weeklyGoal)) * 100));

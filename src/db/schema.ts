@@ -52,6 +52,7 @@ export const applications = sqliteTable("applications", {
   notes: text("notes"),
   jdText: text("jd_text"), // raw job description for reference / re-extraction
   prepPack: text("prep_pack"), // v4: AI interview prep, generated when stage hits Interviewing
+  emailThreadId: text("email_thread_id"), // v5: set when auto-added from an application email (dedupe)
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
   demo: integer("demo", { mode: "boolean" }).notNull().default(false),
   lastActivityAt: integer("last_activity_at", { mode: "timestamp_ms" }).$defaultFn(
@@ -265,9 +266,11 @@ export const suggestions = sqliteTable("suggestions", {
   subject: text("subject"),
   fromAddr: text("from_addr"),
   snippet: text("snippet"),
-  kind: text("kind").notNull(), // interview | rejection | reply
+  kind: text("kind").notNull(), // interview | rejection | reply | offer | applied
   proposedStageId: text("proposed_stage_id"),
   proposedTask: text("proposed_task"),
+  proposedCompany: text("proposed_company"), // v5: for kind "applied" — create a new application
+  proposedTitle: text("proposed_title"),
   status: text("status").notNull().default("pending"), // pending | applied | dismissed
   createdAt: now(),
 });
